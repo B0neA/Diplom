@@ -1,0 +1,131 @@
+header {
+    background-color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 70px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 2px solid #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.headerBody {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 95%;
+    max-width: 1200px;
+}
+
+.headerLeft {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 25px;
+    flex: 1;
+}
+
+.headerLeft img {
+    pointer-events: none;
+    transition: transform 0.2s ease;
+    width: 50px;
+    height: 45px;
+}
+
+.headerLeft img:hover {
+    transform: scale(1.05);
+}
+
+.search-input, .location-input {
+    border: 2px solid #e0e0e0;
+    border-radius: 25px;
+    outline: none;
+    padding: 10px 15px 10px 45px;
+    font-size: 15px;
+    font-weight: 400;
+    color: #333;
+    background-color: #f8f9fa;
+    transition: all 0.2s ease;
+    min-width: 180px;
+    height: 42px;
+    box-sizing: border-box;
+}
+
+.search-input:focus, .location-input:focus {
+    border-color: #4CAF50;
+    background-color: white;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+.search-input::placeholder, .location-input::placeholder {
+    color: #999;
+    font-weight: 400;
+}
+
+.location-input {
+    background-image: url('/src/assets/icons/iconLocation.svg');
+    background-repeat: no-repeat;
+    background-position: 15px center;
+    background-size: 20px 20px;
+    background-color: #f8f9fa;
+}
+
+.search-input {
+    background-image: url('/src/assets/icons/searchLogo.svg');
+    background-repeat: no-repeat;
+    background-position: 15px center;
+    background-size: 20px 20px;
+    background-color: #f8f9fa;
+}
+
+.headerNav {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 25px;
+}
+
+.headerNav img {
+    pointer-events: none;
+    height: 30px;
+    width: 30px;
+    border-radius: 50%;
+    padding: 5px;
+    transition: all 0.2s ease;
+    background-color: #f8f9fa;
+}
+
+.headerNav img:hover {
+    background-color: #e8f5e9;
+    transform: scale(1.05);
+}
+
+#headerCart {
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    border-radius: 25px;
+    color: white;
+    font-weight: 500;
+    font-size: 15px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 42px;
+    box-sizing: border-box;
+}
+
+#headerCart:hover {
+    background-color: #45a049;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
+}
+
+#headerCart:active {
+    transform: translateY(0);
+}
