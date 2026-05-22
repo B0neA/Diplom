@@ -1,13 +1,13 @@
 footer {
     margin-top: 40px;
-    background-color: white;
+    background-color: #fff;
     display: flex;
     justify-content: center;
-    height: 70px;
+    height: 64px;
     flex-shrink: 0;
-    border-top: 2px solid #e0e0e0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+    border-top: 1px solid #f0f0f0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.03);
 }
 
 .footerItem {
@@ -20,7 +20,7 @@ footer {
 
 .footerItem p {
     font-weight: 500;
-    color: #666;
+    color: #999;
     font-size: 14px;
     margin: 0;
     line-height: 1.4;
@@ -28,5 +28,5 @@ footer {
 
 .footerItem p:first-child {
     font-weight: 600;
-    color: #333;
+    color: #1e1e1e;
 }

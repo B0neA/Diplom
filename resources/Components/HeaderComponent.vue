@@ -1,459 +1,227 @@
 <template>
-
-<header>
+  <header>
     <div class="headerBody">
       <div class="headerLeft">
-        <a href="/"><img src="../assets/icons/iconLogo.svg" alt="Logo" height="45px" width="50px" pointer-events: none></a>
-          <input class="search-input"
-            v-model="searchQuery"
-            placeholder="Поиск..."  
-          >                          
-          <input class="location-input"
-          v-model="searchLocation"
-          placeholder="Ваш Адрес"         
-          >
+        <a href="/"><img :src="settings.logo_icon" alt="Logo" height="45" width="50" @error="onIconError"></a>
+        
+        <div class="search-container">
+          <input class="search-input" v-model="searchQuery" placeholder="Поиск ресторанов..."
+            @input="searchRestaurants" @focus="showResults = !!searchQuery" @blur="hideResults">
+          <div v-if="showResults && filtered.length" class="search-results">
+            <div v-for="r in filtered" :key="r.id" class="search-result-item" @mousedown="goToRestaurant(r.id)">
+              <span class="restaurant-name">{{ r.title }}</span>
+              <span class="restaurant-rating">★ {{ r.rating }}</span>
+            </div>
+          </div>
+          <div v-if="showResults && searchQuery && !filtered.length" class="search-results">
+            <div class="search-no-results">Рестораны не найдены</div>
+          </div>
+        </div>
+        
+        <input class="location-input" v-model="searchLocation" placeholder="Ваш Адрес">
       </div>
                   
       <nav class="headerNav">
-          <a v-if="isOnHomePage" href="#" id="headerCart" @click.prevent="toggleCartPopup"> Корзина </a>
-          <a href=""> <img src="../assets/icons/profileIcon.svg" alt="Profile"> </a>
-      </nav>
+  <!-- Корзина -->
+  <a v-if="isOnHomePage" href="#" id="headerCart" @click.prevent="showCart = !showCart">Корзина</a>
+  
+  <!-- Профиль / Вход -->
+  <a v-if="user" href="/profile" id="headerCart" class="header-profile-link">{{ userName }}</a>
+  <a v-else href="/auth" id="headerCart">Войти</a>
+</nav>
 
-
-
-      <div v-if="showCartPopup" class="cart-popup-overlay" @click="closeCartPopup">
-      <div class="cart-popup" @click.stop>
-        <div class="cart-popup-header">
-          <h3>Ваша корзина</h3>
-          <button class="close-btn" @click="closeCartPopup">×</button>
-        </div>
-        
-        <div class="cart-popup-content">
-          <div v-if="allCartItems.length === 0" class="empty-cart-popup">
-            <p>Корзина пуста</p>
+      <!-- Поп-ап корзины -->
+      <div v-if="showCart" class="cart-popup-overlay" @click="showCart = false">
+        <div class="cart-popup" @click.stop>
+          <div class="cart-popup-header">
+            <h3>Ваша корзина</h3>
+            <button class="close-btn" @click="showCart = false">×</button>
           </div>
-          
-          <div v-else class="cart-items-popup">
-            <!-- Группируем по ресторанам -->
-            <div v-for="restaurant in groupedByRestaurant" :key="restaurant.id" class="restaurant-group">
-              <div class="restaurant-header">
-                <h4>{{ restaurant.name }}</h4>
-                <button 
-                    class="go-to-restaurant-btn" 
-                    @click="goToRestaurant(restaurant.id)"
-                    title="Перейти в ресторан"
-                  >
-                    →
-                  </button>
-              </div>
-              
-              <div class="restaurant-items">
-                <div v-for="item in restaurant.items" :key="item.id" class="cart-item-popup">
-                  <div class="cart-item-info">
-                    <div class="item-name">{{ item.name }}</div>
-                    <div class="item-details">
-                      <span>{{ item.quantity }} × {{ item.price }} ₽</span>
-                      <span class="item-total">{{ item.price * item.quantity }} ₽</span>
+          <div class="cart-popup-content">
+            <div v-if="!cartItems.length" class="empty-cart-popup">
+              <img :src="settings.cart_empty_icon" alt="Пусто" class="empty-cart-icon" @error="onIconError" />
+              <p>Корзина пуста</p>
+            </div>
+            <div v-else class="cart-items-popup">
+              <div v-for="group in groupedCart" :key="group.id" class="restaurant-group">
+                <div class="restaurant-header">
+                  <div class="restaurant-header-top">
+                    <h4>{{ group.name }}</h4>
+                    <button class="go-to-restaurant-btn" @click="goToRestaurant(group.id)" title="Перейти">→</button>
+                  </div>
+                </div>
+                <div class="restaurant-items">
+                  <div v-for="item in group.items" :key="item.id" class="cart-item-popup">
+                    <div class="cart-item-info">
+                      <div class="item-name">{{ item.name }}</div>
+                      <div class="item-details">
+                        <span>{{ item.quantity }} × {{ item.price }} ₽</span>
+                        <span class="item-total">{{ item.price * item.quantity }} ₽</span>
+                      </div>
                     </div>
                   </div>
                 </div>
+                <div class="restaurant-total">Итого: {{ group.total }} ₽</div>
               </div>
-
-              
-              
-              <div class="restaurant-total">
-                Итого по ресторану: {{ restaurant.total }} ₽
+              <div class="cart-popup-summary">
+                <p><strong>Общая сумма: {{ totalPrice }} ₽</strong></p>
+                <button class="view-full-cart-btn" @click="goToCartPage">Оформить заказ</button>
               </div>
-            </div>
-            
-            <div class="cart-popup-summary">
-              <p><strong>Общая сумма: {{ totalCartPrice }} ₽</strong></p>
-              <button class="view-full-cart-btn" @click="goToCartPage">Оформить заказ</button>
             </div>
           </div>
         </div>
       </div>
     </div>
-    </div>
-    
   </header>
-
 </template>
 
-
-
 <script>
+import { usePage, router } from '@inertiajs/vue3';
+import { supabase, api } from '../../resources/js/supabase.js';
+
+
+const RESTAURANTS = [
+  { id: 1, title: 'KFC', rating: 4 }, { id: 2, title: 'Велопицца', rating: 5 },
+  { id: 3, title: 'Вкусно и точка', rating: 3 }, { id: 4, title: 'На лаваше', rating: 4 },
+  { id: 5, title: 'Pizzaiolo', rating: 4 }, { id: 6, title: 'Burger King', rating: 4 },
+  { id: 7, title: 'Subway', rating: 4 }, { id: 8, title: 'Starbucks', rating: 5 },
+  { id: 10, title: 'Теремок', rating: 4 }, { id: 11, title: 'Шаурма №1', rating: 3 },
+  { id: 12, title: 'Dominos Pizza', rating: 5 }, { id: 13, title: 'Суши Wok', rating: 4 },
+  { id: 14, title: 'Kebab House', rating: 4 }, { id: 15, title: 'Кофемания', rating: 5 },
+  { id: 16, title: 'Чайхона №1', rating: 4 }, { id: 17, title: 'Папа Джонс', rating: 4 },
+  { id: 18, title: 'Вареничная №1', rating: 5 }, { id: 19, title: 'Ванлав', rating: 4 },
+  { id: 20, title: 'Арома', rating: 4 },
+];
+
 export default {
-   name: 'HeaderComponent',
-  data() {
-    return {
-      searchQuery: '',
-      searchLocation: '',
-      showCartPopup: false,
-      restaurants: [
-        { id: 1, title: 'KFC', rating: 4 },
-        { id: 2, title: 'Велопицца', rating: 5 },
-        { id: 3, title: 'Вкусно и точка', rating: 3 },
-        { id: 4, title: 'На лаваше', rating: 4 },
-        { id: 5, title: 'Pizzaiolo', rating: 4 },
-        { id: 6, title: 'Burger King', rating: 4 },
-        { id: 7, title: 'Subway', rating: 4 },
-        { id: 8, title: 'Starbucks', rating: 5 },
-        
-        { id: 10, title: 'Теремок', rating: 4 },
-        { id: 11, title: 'Шаурма №1', rating: 3 },
-        { id: 12, title: 'Dominos Pizza', rating: 5 },
-        { id: 13, title: 'Суши Wok', rating: 4 },
-        { id: 14, title: 'Kebab House', rating: 4 },
-        { id: 15, title: 'Кофемания', rating: 5 },
-        { id: 16, title: 'Чайхона №1', rating: 4 },
-        { id: 17, title: 'Папа Джонс', rating: 4 },
-        { id: 18, title: 'Вареничная №1', rating: 5 },
-        { id: 19, title: 'Ванлав', rating: 4 },
-        { id: 20, title: 'Арома', rating: 4 },
-      ]
-    }
-  },
+  name: 'HeaderComponent',
+  data: () => ({
+    searchQuery: '', searchLocation: '', showCart: false, showResults: false, filtered: [],
+    user: null, userName: '',
+    settings: { logo_icon: '', profile_icon: '', location_icon: '', search_icon: '', cart_empty_icon: '' },
+  }),
   computed: {
-
-     isOnHomePage() {
-      // Проверяем, находимся ли мы на главной странице
-      // Если у вашей главной страницы путь '/' или '/products'
-      return this.$route?.path === '/' || this.$route?.path === '/products';
+    isOnHomePage() { return ['/', '/restaurans'].includes(usePage().url); },
+    cartItems() {
+      try { return JSON.parse(localStorage.getItem('shoppingCart') || '[]'); }
+      catch { return []; }
     },
-    
-    // Если ProductsView - это ваша главная страница
-    isOnProductsView() {
-      // Проверяем имя маршрута или путь
-      return this.$route?.name === 'ProductsView' || 
-             this.$route?.path === '/products' ||
-             this.$route?.path === '/';
-    },
-    
-    allCartItems() {
-      const savedCart = localStorage.getItem('shoppingCart');
-      if (!savedCart) return [];
-      
-      const cartItems = JSON.parse(savedCart);
-      
-      return cartItems.map(item => {
-        const restaurant = this.restaurants.find(r => r.id === item.restaurantId);
-        return {
-          ...item,
-          restaurantName: restaurant ? restaurant.title : `Ресторан #${item.restaurantId}`
-        };
-      });
-    },
-
-
-
-
-    allCartItems() {
-      const savedCart = localStorage.getItem('shoppingCart');
-      if (!savedCart) return [];
-      
-      const cartItems = JSON.parse(savedCart);
-      
-      return cartItems.map(item => {
-        const restaurant = this.restaurants.find(r => r.id === item.restaurantId);
-        return {
-          ...item,
-          restaurantName: restaurant ? restaurant.title : `Ресторан #${item.restaurantId}`
-        };
-      });
-    },
-    
-    groupedByRestaurant() {
+    groupedCart() {
       const groups = {};
-      
-      this.allCartItems.forEach(item => {
-        if (!groups[item.restaurantId]) {
-          const restaurant = this.restaurants.find(r => r.id === item.restaurantId);
-          groups[item.restaurantId] = {
-            id: item.restaurantId,
-            name: restaurant ? restaurant.title : `Ресторан #${item.restaurantId}`,
-            items: [],
-            total: 0
-          };
+      this.cartItems.forEach(item => {
+        const id = item.restaurantId || item.restaurant_id;
+        if (!groups[id]) {
+          const r = RESTAURANTS.find(r => r.id == id);
+          groups[id] = { id, name: r?.title || `Ресторан #${id}`, items: [], total: 0 };
         }
-        
-        groups[item.restaurantId].items.push(item);
-        groups[item.restaurantId].total += item.price * item.quantity;
+        groups[id].items.push(item);
+        groups[id].total += item.price * item.quantity;
       });
-      
       return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
     },
-    
-    totalCartPrice() {
-      return this.allCartItems.reduce((total, item) => {
-        return total + (item.price * item.quantity);
-      }, 0);
-    }
+    totalPrice() { return this.cartItems.reduce((t, i) => t + i.price * i.quantity, 0); },
   },
   methods: {
-    toggleCartPopup() {
-      this.showCartPopup = !this.showCartPopup;
+    async checkAuth() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          this.user = user;
+          this.userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Профиль';
+        }
+      } catch { this.user = null; }
     },
-    
-    closeCartPopup() {
-      this.showCartPopup = false;
+    async loadSettings() {
+      try {
+        const { data } = await api.get('/site_settings', { params: { id: 'eq.1', select: '*' } });
+        if (data?.[0]) {
+          Object.keys(data[0]).forEach(key => {
+            if (data[0][key]) this.settings[key] = data[0][key];
+          });
+        }
+      } catch (err) { console.error('Ошибка загрузки иконок:', err); }
     },
-    
-    goToCartPage() {
-      if (this.$router) {
-        this.$router.push('/check');
+    async searchRestaurants() {
+      if (!this.searchQuery.trim()) { this.filtered = []; this.showResults = false; return; }
+      try {
+        const { data } = await api.get('/restaurants', {
+          params: { select: '*', title: `ilike.*${this.searchQuery}*`, order: 'rating.desc', limit: 5 },
+        });
+        this.filtered = data || [];
+      } catch {
+        const q = this.searchQuery.toLowerCase();
+        this.filtered = RESTAURANTS.filter(r => r.title.toLowerCase().includes(q)).slice(0, 5);
       }
-      this.closeCartPopup();
+      this.showResults = true;
     },
-    
-    // Переход к странице ресторана
-    goToRestaurant(restaurantId) {
-  if (this.$router) {
-    this.$router.push(`/product/${restaurantId}`);
-  } else {
-    window.location.href = `/product/${restaurantId}`;
-  }
-  this.closeCartPopup();
-}
+    hideResults() { setTimeout(() => this.showResults = false, 200); },
+    goToRestaurant(id) { this.searchQuery = ''; this.showResults = false; router.visit(`/product/${id}`); },
+    goToCartPage() { this.showCart = false; router.visit('/check'); },
+    onIconError(e) {
+      e.target.src = 'data:image/svg+xml,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="45" fill="%23ff6b00"><rect width="50" height="45" rx="10"/><text x="25" y="28" text-anchor="middle" fill="white" font-size="18" font-weight="bold" font-family="sans-serif">FB</text></svg>'
+      );
+    },
   },
   mounted() {
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.showCartPopup) {
-        this.closeCartPopup();
-      }
-    });
+    this.loadSettings();
+    this.checkAuth();
+    this._esc = e => { if (e.key === 'Escape') { this.showCart = false; this.showResults = false; } };
+    document.addEventListener('keydown', this._esc);
   },
-  beforeUnmount() {
-    document.removeEventListener('keydown', this.handleEscape);
-  }
-}
+  beforeUnmount() { document.removeEventListener('keydown', this._esc); },
+};
 </script>
 
-
 <style scoped>
-
-
 @import "../assets/styles/header.css";
 
+.search-container { position: relative; flex: 1; max-width: 400px; }
+.search-input { width: 100%; padding: 12px 16px; border: 2px solid #eee; border-radius: 14px; font-size: 15px; transition: .2s; background: #fafafa; }
+.search-input:focus { outline: none; border-color: #ff6b00; background: #fff; box-shadow: 0 0 0 4px rgba(255,107,0,0.06); }
+.search-results { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 2px solid #eee; border-radius: 14px; margin-top: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); z-index: 1000; max-height: 300px; overflow-y: auto; }
+.search-result-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; cursor: pointer; transition: background .15s; border-bottom: 1px solid #f5f5f5; }
+.search-result-item:last-child { border-bottom: none; }
+.search-result-item:hover { background: #fff8f0; }
+.restaurant-name { font-size: 15px; font-weight: 600; color: #1e1e1e; }
+.restaurant-rating { font-size: 13px; color: #ff6b00; font-weight: 600; }
+.search-no-results { padding: 16px; text-align: center; color: #999; font-size: 14px; }
 
-.cart-popup-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: flex-end;
-  align-items: flex-start;
-  z-index: 1000;
-  padding-top: 80px;
+/* Стиль кнопок как у корзины */
+.header-profile-link {
+  background: #fff8f0 !important;
+  border-color: #ff6b00 !important;
+  color: #ff6b00 !important;
 }
 
-.cart-popup {
-  background-color: white;
-  border-radius: 8px;
-  width: 420px; /* Немного шире для кнопки */
-  max-height: 600px;
-  margin-right: 20px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  display: flex;
-  flex-direction: column;
-}
+.empty-cart-icon { width: 120px; height: 100px; opacity: .6; margin-bottom: 16px; object-fit: contain; }
 
-.cart-popup-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #eee;
-}
-
-.cart-popup-header h3 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #666;
-  padding: 0;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-}
-
-.close-btn:hover {
-  background-color: #f5f5f5;
-}
-
-.cart-popup-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0;
-}
-
-.empty-cart-popup {
-  padding: 40px 20px;
-  text-align: center;
-  color: #666;
-}
-
-.cart-items-popup {
-  padding: 0;
-}
-
-/* Стили для группы ресторана */
-.restaurant-group {
-  margin-bottom: 15px;
-  border-bottom: 1px solid #eee;
-}
-
-.restaurant-group:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-}
-
-.restaurant-header {
-  background-color: #f9f9f9;
-  padding: 10px 15px;
-  border-bottom: 1px solid #eee;
-}
-
-.restaurant-header-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.restaurant-header h4 {
-  margin: 0;
-  font-size: 16px;
-  color: #333;
-  font-weight: 600;
-}
-
-/* Кнопка перехода к ресторану */
-.go-to-restaurant-btn {
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  width: 30px;
-  height: 30px;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  padding: 0;
-  line-height: 1;
-}
-
-.go-to-restaurant-btn:hover {
-  background-color: #45a049;
-  transform: translateX(2px);
-}
-
-.go-to-restaurant-btn:active {
-  transform: scale(0.95);
-}
-
-.restaurant-items {
-  padding: 0 15px;
-}
-
-.cart-item-popup {
-  padding: 10px 0;
-  border-bottom: 1px solid #f5f5f5;
-}
-
-.cart-item-popup:last-child {
-  border-bottom: none;
-}
-
-.cart-item-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.item-name {
-  font-weight: 500;
-  color: #333;
-  flex: 1;
-  padding-right: 10px;
-}
-
-.item-details {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-  min-width: 120px;
-}
-
-.item-details span {
-  font-size: 14px;
-  color: #666;
-}
-
-.item-total {
-  font-weight: 600;
-  color: #333;
-  font-size: 15px;
-}
-
-.restaurant-total {
-  background-color: #f0f9ff;
-  padding: 8px 15px;
-  font-size: 14px;
-  color: #333;
-  font-weight: 500;
-  border-top: 1px solid #e3f2fd;
-  text-align: right;
-}
-
-.cart-popup-summary {
-  padding: 15px;
-  background-color: #f9f9f9;
-  border-top: 2px solid #ddd;
-  text-align: center;
-  margin-top: 10px;
-}
-
-.cart-popup-summary p {
-  margin: 0 0 15px 0;
-  font-size: 18px;
-  color: #333;
-  font-weight: bold;
-}
-
-.view-full-cart-btn {
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 10px 20px;
-  cursor: pointer;
-  font-size: 14px;
-  width: 100%;
-  transition: background-color 0.2s;
-}
-
-.view-full-cart-btn:hover {
-  background-color: #45a049;
-}
-
-
-
-
+.cart-popup-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: flex-end; align-items: flex-start; z-index: 1000; padding-top: 80px; }
+.cart-popup { background: #fff; border-radius: 20px; width: 420px; max-height: 600px; margin-right: 20px; box-shadow: 0 12px 40px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
+.cart-popup-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; border-bottom: 1px solid #f0f0f0; }
+.cart-popup-header h3 { margin: 0; font-size: 18px; font-weight: 700; color: #1e1e1e; }
+.close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #aaa; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: .2s; }
+.close-btn:hover { background: #f5f5f5; color: #333; }
+.cart-popup-content { flex: 1; overflow-y: auto; }
+.empty-cart-popup { padding: 40px 20px; text-align: center; color: #999; font-size: 16px; display: flex; flex-direction: column; align-items: center; }
+.restaurant-group { margin-bottom: 12px; }
+.restaurant-group:last-child { margin-bottom: 0; }
+.restaurant-header { background: #fefaf5; padding: 12px 16px; }
+.restaurant-header-top { display: flex; justify-content: space-between; align-items: center; }
+.restaurant-header h4 { margin: 0; font-size: 15px; color: #1e1e1e; font-weight: 700; }
+.go-to-restaurant-btn { background: #ff6b00; color: #fff; border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: .2s; }
+.go-to-restaurant-btn:hover { background: #e05e00; transform: translateX(2px); }
+.restaurant-items { padding: 0 16px; }
+.cart-item-popup { padding: 10px 0; border-bottom: 1px solid #f8f8f8; }
+.cart-item-popup:last-child { border-bottom: none; }
+.cart-item-info { display: flex; justify-content: space-between; align-items: flex-start; }
+.item-name { font-weight: 600; color: #1e1e1e; flex: 1; padding-right: 10px; font-size: 14px; }
+.item-details { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 110px; }
+.item-details span { font-size: 13px; color: #999; }
+.item-total { font-weight: 700; color: #ff6b00; font-size: 14px; }
+.restaurant-total { background: #fff8f0; padding: 8px 16px; font-size: 14px; color: #1e1e1e; font-weight: 600; text-align: right; }
+.cart-popup-summary { padding: 16px; background: #fefaf5; text-align: center; margin-top: 8px; }
+.cart-popup-summary p { margin: 0 0 12px; font-size: 18px; color: #1e1e1e; font-weight: 700; }
+.view-full-cart-btn { background: #ff6b00; color: #fff; border: none; border-radius: 40px; padding: 12px 24px; cursor: pointer; font-size: 15px; font-weight: 700; width: 100%; transition: .2s; }
+.view-full-cart-btn:hover { background: #e05e00; }
 </style>

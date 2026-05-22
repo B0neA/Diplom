@@ -1,353 +1,543 @@
 <script setup>
 import HeaderComponent from '../../Components/HeaderComponent.vue';
-import { router, usePage } from '@inertiajs/vue3';
-import { ref, computed, watch, onMounted } from 'vue';
+import { router } from '@inertiajs/vue3';
+import { ref, reactive, watch, onMounted } from 'vue';
 import axios from 'axios';
 
-// Получаем данные из пропсов от Laravel
-const page = usePage();
-const props = computed(() => page.props);
+const api = axios.create({
+  baseURL: 'https://cuibxmcjdkgjffmmzwgd.supabase.co/rest/v1',
+  headers: {
+    apikey: 'sb_publishable_5BPLZkbZvQXw7ZfrMWufFA_K77_nZxh',
+    Authorization: 'Bearer sb_publishable_5BPLZkbZvQXw7ZfrMWufFA_K77_nZxh',
+    'Content-Type': 'application/json',
+  },
+});
 
-// Реактивные данные
 const view = ref('grid');
-const searchQuery = ref('');
-const selectedCategory = ref('');
 const sortBy = ref('rating');
 const sortOrder = ref('desc');
+const loading = ref(false);
+const error = ref(null);
+const restaurants = ref([]);
 
-// Данные из БД (передаются через контроллер)
-const products = computed(() => props.value.products?.data || []);
-const categories = computed(() => props.value.categories || []);
-const pagination = computed(() => props.value.products);
+const settings = reactive({
+  list_icon: '',
+  grid_icon: '',
+  sort_desc_icon: '',
+  sort_asc_icon: '',
+  reset_icon: '',
+  close_icon: '',
+  restaurant_placeholder: '',
+});
 
-// Дополнительно: если нужна realtime синхронизация с Supabase
-const isRealtimeEnabled = ref(false);
+const loadSettings = async () => {
+  try {
+    const { data } = await api.get('/site_settings', {
+      params: { id: 'eq.1', select: '*' },
+    });
+    if (data?.[0]) {
+      Object.keys(data[0]).forEach(key => {
+        if (data[0][key] !== null && data[0][key] !== undefined) {
+          settings[key] = data[0][key];
+        }
+      });
+    }
+  } catch (err) {
+    console.error('Ошибка загрузки настроек:', err);
+  }
+};
+
+const loadRestaurants = async () => {
+  loading.value = true;
+  error.value = null;
+  try {
+    const params = { select: '*', order: `${sortBy.value}.${sortOrder.value}` };
+    const { data } = await api.get('/restaurants', { params });
+    restaurants.value = data || [];
+  } catch (err) {
+    error.value = 'Не удалось загрузить рестораны.';
+  } finally { loading.value = false; }
+};
 
 const isGrid = () => view.value === 'grid';
-
-const goToProduct = (id) => {
-    router.visit(`/product/${id}`);
-};
-
-const applyFilters = () => {
-    router.visit('/', {
-        method: 'get',
-        data: {
-            search: searchQuery.value,
-            category: selectedCategory.value,
-            sort_by: sortBy.value,
-            sort_order: sortOrder.value,
-        },
-        preserveState: true,
-        preserveScroll: true,
-    });
-};
-
+const goToRestaurant = (id) => router.visit(`/product/${id}`);
+const applyFilters = () => loadRestaurants();
 const resetFilters = () => {
-    searchQuery.value = '';
-    selectedCategory.value = '';
-    sortBy.value = 'rating';
-    sortOrder.value = 'desc';
-    applyFilters();
+  sortBy.value = 'rating';
+  sortOrder.value = 'desc';
+  loadRestaurants();
 };
 
-const changePage = (url) => {
-    if (url) {
-        router.visit(url, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    }
+const onIconError = (e) => {
+  e.target.style.display = 'none';
 };
 
-// Дебаунс для поиска
-let debounceTimeout;
-watch(searchQuery, () => {
-    clearTimeout(debounceTimeout);
-    debounceTimeout = setTimeout(() => {
-        applyFilters();
-    }, 500);
-});
-
-watch([selectedCategory, sortBy, sortOrder], () => {
-    applyFilters();
-});
-
-// Опционально: Realtime подписка на изменения в Supabase
-const enableRealtime = () => {
-    if (!window.supabase) return;
-    
-    const supabase = window.supabase.createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY
-    );
-    
-    supabase
-        .channel('products-changes')
-        .on('postgres_changes', 
-            { event: '*', schema: 'public', table: 'products' },
-            (payload) => {
-                console.log('Изменение в БД:', payload);
-                // Обновляем данные
-                applyFilters();
-            }
-        )
-        .subscribe();
-    
-    isRealtimeEnabled.value = true;
+const onImageError = (e) => {
+  e.target.src = 'data:image/svg+xml,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="267" viewBox="0 0 400 267" fill="none">' +
+    '<rect width="400" height="267" fill="%23eef0f2"/>' +
+    '<text x="200" y="140" text-anchor="middle" fill="%23ccc" font-size="16" font-family="sans-serif">Нет фото</text>' +
+    '</svg>'
+  );
 };
 
-// Включаем realtime только если нужно
+watch([sortBy, sortOrder], applyFilters);
 onMounted(() => {
-    if (import.meta.env.VITE_ENABLE_REALTIME === 'true') {
-        enableRealtime();
-    }
+  loadSettings();
+  loadRestaurants();
 });
 </script>
 
 <template>
-    <HeaderComponent />
-    <section class="page">
-        <!-- Фильтры и поиск (те же самые) -->
-        <div class="filters">
-            <input 
-                v-model="searchQuery"
-                type="text" 
-                placeholder="Поиск заведений..."
-                class="search-input"
-            />
-            
-            <select v-model="selectedCategory" class="filter-select">
-                <option value="">Все категории</option>
-                <option v-for="cat in categories" :key="cat" :value="cat">
-                    {{ cat }}
-                </option>
-            </select>
-            
+  <HeaderComponent />
+  <section class="page">
+    <div class="content-container">
+      <!-- ФИЛЬТРЫ -->
+      <div class="filters">
+        <div class="filters__row">
+          <div class="filters__sort-group">
             <select v-model="sortBy" class="filter-select">
-                <option value="rating">По рейтингу</option>
-                <option value="title">По названию</option>
-                <option value="price">По цене</option>
+              <option value="rating">По рейтингу</option>
+              <option value="title">По названию</option>
+              <option value="delivery_time">По времени доставки</option>
             </select>
             
-            <select v-model="sortOrder" class="filter-select">
-                <option value="desc">По убыванию</option>
-                <option value="asc">По возрастанию</option>
-            </select>
-            
-            <button @click="resetFilters" class="reset-btn">
-                Сбросить
-            </button>
-            
-            <button @click="view = view === 'grid' ? 'list' : 'grid'" class="view-toggle">
-                {{ view === 'grid' ? '📋 Список' : '🔲 Сетка' }}
-            </button>
-        </div>
-
-        <!-- Отображение продуктов из облачной БД -->
-        <div :class="['grid', { list: !isGrid() }]">
-            <article 
-                v-for="p in products" 
-                :key="p.id" 
-                class="card"
-                @click="goToProduct(p.id)"
-            >
-                <img :src="p.img" :alt="p.title" loading="lazy"/>
-                <h3>{{ p.title }}</h3>
-                <p class="rating">
-                    ★ {{ p.rating }}
-                </p>
-                <p v-if="p.price" class="price">
-                    от {{ p.price }} ₽
-                </p>
-            </article>
-        </div>
-
-        <!-- Пагинация -->
-        <div v-if="pagination && pagination.last_page > 1" class="pagination">
+            <!-- Кнопка сортировки по убыванию (↓) -->
             <button 
-                @click="changePage(pagination.prev_page_url)" 
-                :disabled="!pagination.prev_page_url"
-                class="page-btn"
+              @click="sortOrder = 'desc'"
+              :class="['filter-btn', 'filter-btn--sort', { 'filter-btn--active': sortOrder === 'desc' }]"
+              title="По убыванию"
             >
-                ← Назад
+              <img :src="settings.sort_desc_icon" class="btn-icon" @error="onIconError" />
             </button>
             
-            <span class="page-info">
-                Страница {{ pagination.current_page }} из {{ pagination.last_page }}
-            </span>
-            
+            <!-- Кнопка сортировки по возрастанию (↑) -->
             <button 
-                @click="changePage(pagination.next_page_url)" 
-                :disabled="!pagination.next_page_url"
-                class="page-btn"
+              @click="sortOrder = 'asc'"
+              :class="['filter-btn', 'filter-btn--sort', { 'filter-btn--active': sortOrder === 'asc' }]"
+              title="По возрастанию"
             >
-                Вперед →
+              <img :src="settings.sort_asc_icon" class="btn-icon" @error="onIconError" />
             </button>
+          </div>
+          
+          <div class="filters__actions">
+            <!-- Кнопка переключения вида (сетка/список) -->
+            <button 
+              @click="view = view === 'grid' ? 'list' : 'grid'" 
+              class="filter-btn" 
+              :title="view === 'grid' ? 'Список' : 'Сетка'"
+            >
+              <img v-if="view === 'grid'" :src="settings.list_icon" class="btn-icon" @error="onIconError" />
+              <img v-else :src="settings.grid_icon" class="btn-icon" @error="onIconError" />
+            </button>
+            
+            <!-- Кнопка сброса -->
+            <button @click="resetFilters" class="filter-btn filter-btn--reset" title="Сбросить фильтры">
+              <img :src="settings.reset_icon" class="btn-icon" @error="onIconError" />
+            </button>
+          </div>
         </div>
-    </section>
+        
+        <!-- Активные фильтры -->
+        <div v-if="sortBy !== 'rating' || sortOrder !== 'desc'" class="filters__active">
+          <span class="active-label">Фильтры:</span>
+          
+          <span v-if="sortBy !== 'rating'" class="active-tag">
+            {{ sortBy === 'title' ? 'По названию' : 'По доставке' }}
+            <button @click="sortBy = 'rating'" class="tag-close">
+              <img :src="settings.close_icon" class="tag-icon" @error="onIconError" />
+            </button>
+          </span>
+          
+          <span v-if="sortOrder !== 'desc'" class="active-tag">
+            По возрастанию
+            <button @click="sortOrder = 'desc'" class="tag-close">
+              <img :src="settings.close_icon" class="tag-icon" @error="onIconError" />
+            </button>
+          </span>
+          
+          <button @click="resetFilters" class="clear-all">Сбросить всё</button>
+        </div>
+      </div>
+
+      <!-- СТАТУСЫ -->
+      <div v-if="loading" class="status">Загрузка ресторанов...</div>
+      <div v-else-if="error" class="status error">
+        {{ error }}
+        <button @click="loadRestaurants" class="retry-btn">Повторить</button>
+      </div>
+      <div v-else-if="!restaurants.length" class="status">Рестораны не найдены</div>
+
+      <!-- КАРТОЧКИ -->
+      <div v-else :class="['grid', { list: !isGrid() }]">
+        <article v-for="r in restaurants" :key="r.id" class="card" @click="goToRestaurant(r.id)">
+          <div class="card-img-wrapper">
+            <img :src="r.img || settings.restaurant_placeholder" :alt="r.title" loading="lazy" @error="onImageError" />
+          </div>
+          <div class="card-body">
+            <h3>{{ r.title }}</h3>
+            <div class="rating-row">
+              <span class="star">★</span>
+              <span class="rating-value">{{ r.rating }}</span>
+              <span class="delivery-time">30-45 мин</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
 </template>
 
 <style scoped>
-
+/* ========== БАЗА ========== */
 .page {
-    padding: 20px;
-    min-height: 100vh;
-    background-color: #f8f9fa;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #fefaf5;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1e1e1e;
+  line-height: 1.5;
+  padding-top: 30px;
 }
 
+.content-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem 3rem;
+}
+
+/* ========== ФИЛЬТРЫ ========== */
 .filters {
-    display: flex;
-    gap: 15px;
-    margin-bottom: 30px;
-    flex-wrap: wrap;
-    align-items: center;
-    padding: 20px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: #fff;
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
 }
 
-.search-input {
-    flex: 1;
-    min-width: 200px;
-    padding: 10px 15px;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    font-size: 16px;
-    transition: all 0.3s ease;
+.filters__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 
-.search-input:focus {
-    outline: none;
-    border-color: #42b983;
-    box-shadow: 0 0 0 3px rgba(66, 185, 131, 0.1);
+.filters__sort-group {
+  display: flex;
+  gap: 8px;
+  flex: 1;
 }
 
 .filter-select {
-    padding: 10px 15px;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    font-size: 16px;
-    background: white;
-    cursor: pointer;
+  padding: 12px 16px;
+  border: 2px solid #eee;
+  border-radius: 14px;
+  font-size: 15px;
+  background: #fafafa;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1;
+  max-width: 250px;
+  color: #333;
+  font-weight: 500;
 }
 
-.reset-btn, .view-toggle {
-    padding: 10px 20px;
-    background: #f5f5f5;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: all 0.3s ease;
+.filter-select:focus {
+  outline: none;
+  border-color: #ff6b00;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(255, 107, 0, 0.06);
 }
 
-.reset-btn:hover, .view-toggle:hover {
-    background: #e0e0e0;
-    transform: translateY(-2px);
+.filters__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
+/* ========== КНОПКИ ========== */
+.filter-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #eee;
+  border-radius: 14px;
+  background: #fafafa;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-btn:hover {
+  background: #f0f0f0;
+  border-color: #ddd;
+}
+
+/* Кнопки сортировки */
+.filter-btn--sort {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+/* Активная кнопка сортировки */
+.filter-btn--active {
+  border-color: #ff6b00 !important;
+  background: #fff8f0 !important;
+  box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.15);
+}
+
+/* Неактивная кнопка сортировки */
+.filter-btn--sort:not(.filter-btn--active) {
+  border-color: #eee;
+  background: #fafafa;
+  opacity: 0.6;
+}
+
+.filter-btn--sort:not(.filter-btn--active):hover {
+  opacity: 1;
+  border-color: #ddd;
+  background: #f0f0f0;
+}
+
+/* Кнопка сброса */
+.filter-btn--reset:hover {
+  border-color: #e74c3c;
+  color: #e74c3c;
+  background: #fff5f5;
+}
+
+.btn-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+/* ========== АКТИВНЫЕ ФИЛЬТРЫ ========== */
+.filters__active {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+}
+
+.active-label {
+  font-size: 13px;
+  color: #999;
+  font-weight: 500;
+}
+
+.active-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #fff8f0;
+  border: 1px solid #ff6b00;
+  border-radius: 20px;
+  font-size: 13px;
+  color: #ff6b00;
+  font-weight: 500;
+}
+
+.tag-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.tag-icon {
+  width: 12px;
+  height: 12px;
+  object-fit: contain;
+}
+
+.clear-all {
+  background: none;
+  border: none;
+  color: #e74c3c;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  margin-left: auto;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: 0.2s;
+}
+
+.clear-all:hover {
+  background: #fff5f5;
+}
+
+/* ========== СЕТКА КАРТОЧЕК ========== */
 .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
 }
 
 .grid.list {
-    grid-template-columns: 1fr;
+  grid-template-columns: 1fr;
 }
 
+/* ========== КАРТОЧКА ========== */
 .card {
-    border-radius: 12px;
-    padding: 15px;
-    cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    background: white;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: 0.2s;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  transform: translateY(-6px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
 }
 
-.card img {
-    width: 100%;
-    height: 150px;
-    object-fit: cover;
-    border-radius: 8px;
-    margin-bottom: 12px;
-    background: #f0f0f0;
+.card-img-wrapper {
+  position: relative;
+  width: 100%;
+  padding-top: 66.67%;
+  overflow: hidden;
+  background: #eef0f2;
 }
 
-.card h3 {
-    margin: 0 0 8px 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: #333;
+.card-img-wrapper img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s;
 }
 
-.rating {
-    margin: 0;
-    font-size: 16px;
-    color: #ff9800;
-    font-weight: 500;
+.card:hover .card-img-wrapper img {
+  transform: scale(1.06);
 }
 
-.price {
-    margin: 5px 0 0;
-    font-size: 14px;
-    color: #42b983;
-    font-weight: 600;
+.card-body {
+  padding: 14px 16px 16px;
 }
 
-.pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 20px;
-    margin-top: 40px;
-    padding: 20px;
+.card-body h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a1a;
 }
 
-.page-btn {
-    padding: 10px 20px;
-    background: white;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
+.rating-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.page-btn:hover:not(:disabled) {
-    background: #42b983;
-    color: white;
+.star {
+  color: #ff6b00;
+  font-size: 15px;
 }
 
-.page-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.rating-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
 }
 
-.page-info {
-    font-size: 16px;
-    color: #666;
+.delivery-time {
+  margin-left: auto;
+  font-size: 13px;
+  color: #999;
+  background: #fafafa;
+  padding: 4px 10px;
+  border-radius: 20px;
 }
 
+/* ========== СТАТУСЫ ========== */
+.status {
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 18px;
+  color: #666;
+}
+
+.status.error {
+  color: #e74c3c;
+}
+
+.retry-btn {
+  margin-top: 15px;
+  padding: 12px 28px;
+  background: #ff6b00;
+  color: #fff;
+  border: none;
+  border-radius: 40px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 15px;
+  transition: 0.2s;
+}
+
+.retry-btn:hover {
+  background: #e05e00;
+}
+
+/* ========== РЕЖИМ СПИСКА ========== */
+.grid.list .card {
+  display: flex;
+  flex-direction: row;
+}
+
+.grid.list .card-img-wrapper {
+  width: 200px;
+  padding-top: 0;
+  height: 140px;
+  flex-shrink: 0;
+}
+
+.grid.list .card-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* ========== АДАПТИВ ========== */
 @media (max-width: 768px) {
-    .filters {
-        flex-direction: column;
-    }
-    
-    .search-input, .filter-select, .reset-btn, .view-toggle {
-        width: 100%;
-    }
-    
-    .grid {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    }
+  .filters__row {
+    flex-direction: column;
+  }
+
+  .filters__sort-group {
+    width: 100%;
+  }
+
+  .filter-select {
+    max-width: 100%;
+  }
+
+  .filters__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .grid.list .card {
+    flex-direction: column;
+  }
+
+  .grid.list .card-img-wrapper {
+    width: 100%;
+    height: 180px;
+  }
 }
 </style>
