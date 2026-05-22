@@ -20,15 +20,15 @@
         <div v-if="editMode" class="edit-form">
           <div class="form-group">
             <label>Имя</label>
-            <input v-model="fullName" type="text" />
+            <input v-model="fullName" type="text" placeholder="Ваше имя" />
           </div>
           <div class="form-group">
             <label>Телефон</label>
-            <input v-model="phone" type="tel" />
+            <input v-model="phone" type="tel" placeholder="+7 (___) ___-__-__" @input="formatPhone" />
           </div>
           <div class="form-group">
             <label>Адрес</label>
-            <input v-model="address" type="text" />
+            <input v-model="address" type="text" placeholder="Улица, дом, квартира" />
           </div>
           <button @click="saveProfile" class="save-btn">Сохранить</button>
         </div>
@@ -57,7 +57,7 @@
 
 <script>
 import HeaderComponent from '../../../Components/HeaderComponent.vue';
-import { supabase, api } from '../../supabase';
+import { supabase, api } from '../../../js/supabase.js';
 
 export default {
   name: 'ProfilePage',
@@ -71,12 +71,15 @@ export default {
   methods: {
     async loadProfile() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.visit('/auth');
+      if (!user) {
+        window.location.href = '/auth';
+        return;
+      }
       this.email = user.email;
       const { data } = await api.get('/profiles', { params: { id: `eq.${user.id}`, select: '*' } });
       if (data?.[0]) {
         this.fullName = data[0].full_name || '';
-        this.phone = data[0].phone || '';
+        this.phone = this.formatPhoneNumber(data[0].phone) || '';
         this.address = data[0].address || '';
       }
     },
@@ -90,19 +93,39 @@ export default {
     },
     async saveProfile() {
       const { data: { user } } = await supabase.auth.getUser();
-      await api.patch('/profiles', { full_name: this.fullName, phone: this.phone, address: this.address }, { params: { id: `eq.${user.id}` } });
+      await api.patch('/profiles', {
+        full_name: this.fullName,
+        phone: this.phone.replace(/\D/g, ''),
+        address: this.address,
+      }, { params: { id: `eq.${user.id}` } });
       this.editMode = false;
       alert('Профиль обновлён!');
     },
     async logout() {
       await supabase.auth.signOut();
-      router.visit('/');
+      window.location.href = '/';
+    },
+    formatPhone() {
+      let numbers = this.phone.replace(/\D/g, '').slice(0, 11);
+      if (numbers.startsWith('8')) numbers = '7' + numbers.slice(1);
+      if (numbers.startsWith('9') && numbers.length === 10) numbers = '7' + numbers;
+      this.phone = numbers.length
+        ? `+7 (${numbers.slice(1,4)}) ${numbers.slice(4,7)}-${numbers.slice(7,9)}-${numbers.slice(9,11)}`
+        : '';
+    },
+    formatPhoneNumber(phone) {
+      if (!phone) return '';
+      const numbers = phone.replace(/\D/g, '');
+      if (numbers.length >= 11) {
+        return `+7 (${numbers.slice(1,4)}) ${numbers.slice(4,7)}-${numbers.slice(7,9)}-${numbers.slice(9,11)}`;
+      }
+      return phone;
     },
     statusClass(s) {
-      return { new: 'status-new', delivered: 'status-done', cancelled: 'status-cancel' }[s] || '';
+      return { new: 'status-new', processing: 'status-new', delivering: 'status-new', delivered: 'status-done', cancelled: 'status-cancel' }[s] || '';
     },
     statusText(s) {
-      return { new: 'Новый', delivered: 'Доставлен', cancelled: 'Отменён' }[s] || s;
+      return { new: 'Новый', processing: 'Готовится', delivering: 'В пути', delivered: 'Доставлен', cancelled: 'Отменён' }[s] || s;
     },
     formatDate(d) {
       return new Date(d).toLocaleString('ru-RU');
