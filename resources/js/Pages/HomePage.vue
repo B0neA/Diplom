@@ -159,7 +159,7 @@ onMounted(() => {
     </section>
 
     <section class="benefits">
-      <h2 class="benefits__title">Почему Лопать Подано</h2>
+      <h2 class="benefits__title benefits__title--black">Почему <span class="highlight">Лопать Подано</span></h2>
       <div class="benefits__grid">
         <div class="benefit-card">
           <img :src="settings.benefit_1_icon" alt="" class="benefit-icon" @error="onImageError" />
@@ -270,6 +270,7 @@ onMounted(() => {
 }
 .benefits { padding: 5rem 1.5rem; max-width: 1200px; margin: 0 auto; }
 .benefits__title { font-size: 2.2rem; text-align: center; margin-bottom: 3rem; font-weight: 700; }
+.benefits__title--black { color: #1e1e1e; }
 .benefits__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; }
 .benefit-card { background: #fff; border-radius: 24px; padding: 2.5rem 2rem; text-align: center; box-shadow: 0 4px 16px rgba(0,0,0,0.05); transition: .3s; }
 .benefit-card:hover { transform: translateY(-8px); box-shadow: 0 12px 32px rgba(0,0,0,0.1); }
@@ -306,4 +307,13 @@ onMounted(() => {
   .benefits__title, .cta__content h2, .section-title { font-size: 1.6rem; }
   .hero { background-attachment: scroll; }
 }
+.highlight {
+    background: var(--brand-gradient, linear-gradient(90deg, #ff6b6b, #4ecdc4));
+        background-clip: text;
+        -webkit-background-clip: text;
+        color: transparent;
+  
+}
+
+
 </style>

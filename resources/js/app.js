@@ -2,20 +2,31 @@ import './bootstrap';
 import '../css/app.css'
 
 import { createApp, h } from 'vue';
-import { createInertiaApp } from '@inertiajs/vue3';
+import { createInertiaApp, router } from '@inertiajs/vue3';
 import { loadSiteSettings } from './settingsCache.js';
 
-loadSiteSettings().then((data) => {
-  const favicon = data?.favicon_icon || data?.favicon_url;
-  if (!favicon) return;
-  let link = document.querySelector("link[rel='icon']");
-  if (!link) {
-    link = document.createElement('link');
-    link.rel = 'icon';
-    document.head.appendChild(link);
-  }
-  link.href = favicon;
-}).catch(() => {});
+function setFavicon(href) {
+    if (!href) return;
+    let link = document.querySelector("link[rel='icon']");
+    if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+    }
+    link.href = href;
+}
+
+setFavicon('/favicon.ico');
+loadSiteSettings()
+    .then((settings) => {
+        const icon = settings?.favicon_icon || settings?.favicon_url;
+        if (icon) setFavicon(icon);
+    })
+    .catch(() => {});
+
+router.on('success', () => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+});
 
 createInertiaApp({
     resolve: name => {

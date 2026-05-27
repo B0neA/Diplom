@@ -1069,15 +1069,16 @@ h1 { font-size: 28px; font-weight: 700; color: #1e1e1e; margin-bottom: 2rem; }
 .form-group label { font-size: 14px; font-weight: 500; color: #666; }
 .form-group input { padding: 12px 16px; border: 2px solid #eee; border-radius: 14px; font-size: 15px; background: #fafafa; }
 .form-group input:focus { outline: none; border-color: #ff6b00; background: #fff; }
-.save-btn { padding: 14px; background: #ff6b00; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; }
+.save-btn { padding: 14px; background: var(--brand-gradient); color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; }
+.save-btn:hover:not(:disabled) { filter: brightness(0.97); }
 .save-btn:disabled { opacity: 0.6; }
 .profile-tabs { display: flex; gap: 8px; margin: 1.5rem 0 1rem; flex-wrap: wrap; }
 .profile-tabs button { padding: 10px 20px; border: 2px solid #eee; background: #fff; border-radius: 40px; cursor: pointer; font-weight: 600; font-size: 14px; }
-.profile-tabs button.active { background: #ff6b00; color: #fff; border-color: #ff6b00; }
+.profile-tabs button.active { background: var(--brand-gradient); color: #fff; border-color: var(--brand-solid); }
 .profile-section { margin-bottom: 1rem; }
 .panel { background: #fff; border-radius: 20px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
 .empty-orders { text-align: center; padding: 3rem; background: #fff; border-radius: 20px; }
-.order-link { color: #ff6b00; font-weight: 600; text-decoration: none; }
+.order-link { color: var(--brand-solid); font-weight: 600; text-decoration: none; }
 .orders-list { display: flex; flex-direction: column; gap: 12px; }
 .order-card { background: #fff; border-radius: 16px; padding: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
 .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; cursor: pointer; }
@@ -1085,7 +1086,7 @@ h1 { font-size: 28px; font-weight: 700; color: #1e1e1e; margin-bottom: 2rem; }
 .status-new { background: #fff3e0; color: #e65100; }
 .status-done { background: #e8f5e9; color: #2e7d32; }
 .status-cancel { background: #ffebee; color: #c62828; }
-.order-total { font-size: 20px; font-weight: 700; color: #ff6b00; }
+.order-total { font-size: 20px; font-weight: 700; color: var(--brand-solid); }
 .order-date { font-size: 13px; color: #999; margin-top: 4px; }
 .order-address {
   display: flex;
@@ -1103,7 +1104,7 @@ h1 { font-size: 28px; font-weight: 700; color: #1e1e1e; margin-bottom: 2rem; }
   object-fit: contain;
 }
 .order-address-text { line-height: 1.4; }
-.toggle-items-btn { margin-top: 10px; background: none; border: none; color: #ff6b00; font-weight: 600; cursor: pointer; font-size: 14px; padding: 0; }
+.toggle-items-btn { margin-top: 10px; background: none; border: none; color: var(--brand-solid); font-weight: 600; cursor: pointer; font-size: 14px; padding: 0; }
 .order-items { margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
 .order-restaurant-group { margin-bottom: 14px; }
 .order-restaurant-group:last-child { margin-bottom: 0; }
@@ -1113,7 +1114,7 @@ h1 { font-size: 28px; font-weight: 700; color: #1e1e1e; margin-bottom: 2rem; }
   font-weight: 700;
   color: #1e1e1e;
   padding-bottom: 6px;
-  border-bottom: 2px solid #ff6b00;
+  border-bottom: 2px solid var(--brand-solid);
 }
 .order-item-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 8px 0; border-bottom: 1px solid #fafafa; font-size: 14px; }
 .order-fees-summary {
@@ -1131,7 +1132,7 @@ h1 { font-size: 28px; font-weight: 700; color: #1e1e1e; margin-bottom: 2rem; }
 .order-fee-row .fee-free { color: #2e7d32; font-weight: 600; }
 .edit-delivery-hint {
   font-size: 12px;
-  color: #ff6b00;
+  color: var(--brand-solid);
   margin: 4px 0 8px;
   line-height: 1.4;
 }
@@ -1153,7 +1154,7 @@ h1 { font-size: 28px; font-weight: 700; color: #1e1e1e; margin-bottom: 2rem; }
 .order-notice-modal p { margin: 0 0 20px; color: #666; line-height: 1.5; font-size: 15px; }
 .notice-ok-btn { width: 100%; }
 .order-restaurant-group .order-item-row:last-child { border-bottom: none; }
-.order-window-hint { margin: 12px 0 8px; font-size: 13px; color: #ff6b00; font-weight: 600; }
+.order-window-hint { margin: 12px 0 8px; font-size: 13px; color: var(--brand-solid); font-weight: 600; }
 .order-window-expired { margin: 12px 0 0; font-size: 13px; color: #999; }
 .order-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .order-action-btn {
@@ -1165,12 +1166,12 @@ h1 { font-size: 28px; font-weight: 700; color: #1e1e1e; margin-bottom: 2rem; }
   border: 2px solid transparent;
 }
 .order-action-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.order-action-btn--edit { background: #fff; border-color: #ff6b00; color: #ff6b00; }
+.order-action-btn--edit { background: #fff; border-color: var(--brand-solid); color: var(--brand-solid); }
 .order-action-btn--edit:hover:not(:disabled) { background: #fff8f0; }
 .order-action-btn--cancel { background: #fff; border-color: #e74c3c; color: #e74c3c; }
 .order-action-btn--cancel:hover:not(:disabled) { background: #fff5f5; }
 .edit-order-modal { max-width: 480px; max-height: 90vh; overflow-y: auto; }
-.edit-order-hint { margin: 0 0 16px; font-size: 13px; color: #ff6b00; }
+.edit-order-hint { margin: 0 0 16px; font-size: 13px; color: var(--brand-solid); }
 .edit-order-modal .form-group { margin-bottom: 12px; }
 .edit-order-modal .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
 .edit-order-modal input,
@@ -1204,13 +1205,14 @@ h1 { font-size: 28px; font-weight: 700; color: #1e1e1e; margin-bottom: 2rem; }
   padding: 0;
 }
 .edit-order-totals { margin-top: 14px; font-size: 14px; color: #666; line-height: 1.6; }
-.edit-order-total { font-size: 18px; font-weight: 700; color: #ff6b00; margin-top: 4px; }
-.confirm-save { flex: 1; padding: 12px; border: none; border-radius: 12px; background: #ff6b00; color: #fff; font-weight: 700; cursor: pointer; }
+.edit-order-total { font-size: 18px; font-weight: 700; color: var(--brand-solid); margin-top: 4px; }
+.confirm-save { flex: 1; padding: 12px; border: none; border-radius: 12px; background: var(--brand-gradient); color: #fff; font-weight: 700; cursor: pointer; }
+.confirm-save:hover:not(:disabled) { filter: brightness(0.97); }
 .confirm-save:disabled { opacity: 0.6; cursor: not-allowed; }
 .status-cancel { background: #fdecea; color: #e74c3c; }
 .item-name { font-weight: 500; }
 .item-qty { color: #888; }
-.item-sum { font-weight: 600; color: #ff6b00; }
+.item-sum { font-weight: 600; color: var(--brand-solid); }
 .no-items { color: #999; font-size: 13px; margin: 0; }
 .reviews-grouped { display: flex; flex-direction: column; gap: 24px; }
 .reviews-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
@@ -1227,32 +1229,33 @@ h1 { font-size: 28px; font-weight: 700; color: #1e1e1e; margin-bottom: 2rem; }
   color: #666;
   cursor: pointer;
 }
-.checkout-tab:hover { border-color: #ff6b00; color: #ff6b00; }
-.checkout-tab.active { background: #ff6b00; border-color: #ff6b00; color: #fff; }
+.checkout-tab:hover { border-color: var(--brand-solid); color: var(--brand-solid); }
+.checkout-tab.active { background: var(--brand-gradient); border-color: var(--brand-solid); color: #fff; }
 .type-badge {
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 20px;
   background: #fff3e6;
-  color: #ff6b00;
+  color: var(--brand-solid);
   margin-left: 8px;
 }
 .type-badge--restaurant { background: #eef6ff; color: #2d6cdf; }
-.group-title { margin: 0 0 12px; font-size: 20px; color: #1e1e1e; padding-bottom: 8px; border-bottom: 2px solid #ff6b00; }
+.group-title { margin: 0 0 12px; font-size: 20px; color: #1e1e1e; padding-bottom: 8px; border-bottom: 2px solid var(--brand-solid); }
 .dish-group { margin-bottom: 16px; padding-left: 12px; }
 .dish-group h4 { margin: 0 0 10px; color: #555; font-size: 16px; }
 .review-admin-card { background: #fefaf5; padding: 12px; border-radius: 12px; margin-bottom: 8px; }
 .review-admin-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
-.stars { color: #ff6b00; }
+.stars { color: var(--brand-solid); }
 .review-btns { margin-left: auto; display: flex; gap: 8px; }
 .review-admin-card input, .review-admin-card textarea, .review-admin-card select {
   width: 100%; margin-bottom: 8px; padding: 8px; border: 1px solid #eee; border-radius: 8px; box-sizing: border-box;
 }
 .mini-actions { display: flex; gap: 8px; }
-.mini-actions button { padding: 6px 14px; background: #ff6b00; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.mini-actions button { padding: 6px 14px; background: var(--brand-gradient); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.mini-actions button:hover:not(:disabled) { filter: brightness(0.97); }
 .mini-actions .cancel { background: #fff; color: #666; border: 1px solid #eee; }
-.edit-link { background: none; border: none; color: #ff6b00; cursor: pointer; font-weight: 600; }
+.edit-link { background: none; border: none; color: var(--brand-solid); cursor: pointer; font-weight: 600; }
 .danger-btn { background: #fff; border: 1px solid #e74c3c; color: #e74c3c; padding: 4px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; }
 .pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; }
 .pager button { padding: 8px 14px; border: 1px solid #eee; border-radius: 8px; background: #fff; cursor: pointer; }

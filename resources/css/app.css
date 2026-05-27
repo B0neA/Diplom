@@ -1,0 +1,127 @@
+@import "../assets/styles/base.css";
+@import "../assets/styles/main.css";
+
+/* Unified brand accents across pages/components */
+.hero__btn,
+.auth-btn,
+.save-btn,
+.confirm-save,
+.view-full-cart-btn,
+.quick-order-btn,
+.add-btn,
+.submit-btn,
+.submit-review,
+.review-form button,
+.faq-toolbar-btn,
+.order-success-btn,
+.modal-btn,
+.mini-actions button {
+  background: var(--brand-gradient) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+.hero__btn:hover:not(:disabled),
+.auth-btn:hover:not(:disabled),
+.save-btn:hover:not(:disabled),
+.confirm-save:hover:not(:disabled),
+.view-full-cart-btn:hover:not(:disabled),
+.quick-order-btn:hover:not(:disabled),
+.add-btn:hover:not(:disabled),
+.submit-btn:hover:not(:disabled),
+.submit-review:hover:not(:disabled),
+.review-form button:hover:not(:disabled),
+.faq-toolbar-btn:hover:not(:disabled),
+.order-success-btn:hover:not(:disabled),
+.modal-btn:hover:not(:disabled),
+.mini-actions button:hover:not(:disabled) {
+  filter: brightness(0.97) !important;
+}
+
+.edit-link,
+.order-link,
+.quick-order-profile-link,
+.forgot-row a,
+.auth-switch button,
+.back-link:hover,
+.restaurant-rating,
+.stars,
+.product-rating,
+.price,
+.dish-rating,
+.group-rating,
+.toggle-items-btn,
+.item-sum,
+.order-window-hint,
+.edit-order-hint {
+  color: var(--brand-solid) !important;
+}
+
+.profile-tabs button.active,
+.checkout-tab.active,
+.reviews-tab.active,
+.category-tab.active,
+.cart-tab.active,
+.tabs button.active {
+  background: var(--brand-gradient) !important;
+  border-color: var(--brand-solid) !important;
+  color: #fff !important;
+}
+
+/* Remove any gradient borders on all buttons */
+button,
+a#headerCart,
+.filter-btn,
+.checkout-tab,
+.category-tab,
+.reviews-tab,
+.cart-tab,
+.pay-button,
+.apply-promo-button,
+.clear-cart-button {
+  border-image: none !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+  background-clip: border-box !important;
+}
+
+/* Unified gradient buttons across key pages */
+.pay-button,
+.apply-promo-button,
+.checkout-btn,
+.clear-btn:not(.clear-btn--danger),
+.faq-toolbar-btn,
+.hero__btn,
+.view-full-cart-btn,
+.quick-order-btn,
+.auth-btn,
+.save-btn,
+.confirm-save,
+.submit-btn,
+.submit-review,
+.review-form button,
+.add-btn,
+.add-to-cart-btn,
+.quantity-btn {
+  background: var(--brand-gradient) !important;
+  color: #fff !important;
+  border: none !important;
+}
+
+.pay-button:hover:not(:disabled),
+.apply-promo-button:hover:not(:disabled),
+.checkout-btn:hover:not(:disabled),
+.hero__btn:hover:not(:disabled),
+.view-full-cart-btn:hover:not(:disabled),
+.quick-order-btn:hover:not(:disabled),
+.auth-btn:hover:not(:disabled),
+.save-btn:hover:not(:disabled),
+.confirm-save:hover:not(:disabled),
+.submit-btn:hover:not(:disabled),
+.submit-review:hover:not(:disabled),
+.review-form button:hover:not(:disabled),
+.add-btn:hover:not(:disabled),
+.add-to-cart-btn:hover:not(:disabled),
+.quantity-btn:hover:not(:disabled) {
+  filter: brightness(0.97) !important;
+}

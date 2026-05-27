@@ -226,7 +226,7 @@ export default {
 }
 
 .cart-summary button {
-  background: #ff6b00;
+  background: var(--brand-gradient);
   color: #fff;
   border: none;
   border-radius: 40px;
@@ -238,10 +238,7 @@ export default {
   width: 100%;
 }
 
-.cart-summary button:hover {
-  background: #e05e00;
-  transform: translateY(-2px);
-}
+.cart-summary button:hover { filter: brightness(0.97); transform: translateY(-2px); }
 
 .clear-btn {
   background: #fff !important;
@@ -251,5 +248,37 @@ export default {
 
 .clear-btn:hover {
   background: #fff5f5 !important;
+}
+
+@media (max-width: 640px) {
+  .cart {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 10px 14px 14px;
+    min-height: 0;
+    background: #ffffff;
+    box-shadow: 0 -8px 28px rgba(0,0,0,0.18);
+    border-radius: 18px 18px 0 0;
+    z-index: 120;
+  }
+  .cart h2 {
+    display: none;
+  }
+  .cart-items {
+    max-height: 180px;
+    margin-bottom: 10px;
+  }
+  .cart-summary {
+    border-top: none;
+    padding-top: 4px;
+  }
+  .cart-summary p {
+    font-size: 16px;
+  }
+  .cart-summary button {
+    font-size: 15px;
+  }
 }
 </style>

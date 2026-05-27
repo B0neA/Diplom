@@ -1,10 +1,14 @@
 const STORAGE_KEY = 'lopat_podano_site_settings';
 
 let memoryCache = null;
+let pendingRequest = null;
 
 export async function loadSiteSettings() {
   if (memoryCache) {
     return memoryCache;
+  }
+  if (pendingRequest) {
+    return pendingRequest;
   }
 
   try {
@@ -21,14 +25,21 @@ export async function loadSiteSettings() {
     /* ignore */
   }
 
-  const { data } = await window.axios.get('/api/site-settings');
-  memoryCache = data || {};
-  try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(memoryCache));
-  } catch {
-    /* ignore */
-  }
-  return memoryCache;
+  pendingRequest = window.axios.get('/api/site-settings')
+    .then(({ data }) => {
+      memoryCache = data || {};
+      try {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(memoryCache));
+      } catch {
+        /* ignore */
+      }
+      return memoryCache;
+    })
+    .finally(() => {
+      pendingRequest = null;
+    });
+
+  return pendingRequest;
 }
 
 export function applySiteSettings(target, data) {

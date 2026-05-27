@@ -3,7 +3,18 @@
   <header>
     <div class="headerBody">
       <div class="headerLeft">
-        <a href="/"><img :src="logoSrc" alt="Logo" height="45" width="50" @error="onIconError"></a>
+        <a href="/" class="brand-logo-link" aria-label="Лопать Подано">
+          <span class="brand-logo-icon" :style="brandIconStyle" aria-hidden="true" />
+          <img
+            v-if="logoSrc && !logoMaskFailed"
+            :src="logoSrc"
+            alt=""
+            class="brand-logo-icon-probe"
+            @load="onLogoMaskLoad"
+            @error="onLogoMaskError"
+          >
+          <span class="brand-logo-text">Лопать Подано</span>
+        </a>
         
         <div class="search-container">
           <input class="search-input" v-model="searchQuery" placeholder="Поиск ресторанов..."
@@ -21,12 +32,22 @@
       </div>
                   
       <nav class="headerNav">
-  <a href="#" id="headerCart" class="header-nav-support" @click.prevent="showSupportModal = true">Поддержка</a>
-  <a v-if="isOnHomePage" href="#" id="headerCart" @click.prevent="showCart = !showCart">Корзина</a>
-  <a v-if="isUserAdmin" href="/admin" id="headerCart">Админ</a>
-  <a v-if="user" href="/profile" id="headerCart">{{ userName }}</a>
-  <a v-else href="/auth" id="headerCart">Войти</a>
-</nav>
+        <button
+          type="button"
+          class="burger-btn"
+          aria-label="Меню"
+          @click="mobileMenuOpen = !mobileMenuOpen"
+        >
+          <span></span><span></span><span></span>
+        </button>
+        <div class="header-nav-links" :class="{ 'header-nav-links--open': mobileMenuOpen }">
+          <a href="#" id="headerCart" class="header-nav-support" @click.prevent="showSupportModal = true">Поддержка</a>
+          <a v-if="isOnHomePage" href="#" id="headerCart" @click.prevent="showCart = !showCart">Корзина</a>
+          <a v-if="isUserAdmin" href="/admin" id="headerCart">Админ</a>
+          <a v-if="user" href="/profile" id="headerCart">{{ userName }}</a>
+          <a v-else href="/auth" id="headerCart">Войти</a>
+        </div>
+      </nav>
 
       <!-- Поп-ап корзины -->
       <div v-if="showCart" class="cart-popup-overlay" @click="showCart = false">
@@ -72,7 +93,12 @@
                 <div class="restaurant-header">
                   <div class="restaurant-header-top">
                     <h4>{{ group.name }}</h4>
-                    <button class="go-to-restaurant-btn" @click="goToRestaurant(group.id)" title="Перейти">→</button>
+                    <button
+                      v-if="group.routeRestaurantId"
+                      class="go-to-restaurant-btn"
+                      @click="goToRestaurant(group.routeRestaurantId)"
+                      title="Перейти"
+                    >→</button>
                   </div>
                 </div>
                 <div class="restaurant-items">
@@ -183,6 +209,12 @@ import {
   formatDeliveryFee,
   ORDER_SERVICE_FEE,
 } from '../js/deliveryFee.js';
+import {
+  BRAND_GRADIENT_CSS,
+  brandIconMaskDataUrl,
+  brandIconSvgDataUrl,
+  cssMaskUrl,
+} from '../js/brandAssets.js';
 
 
 const RESTAURANTS = [
@@ -215,6 +247,11 @@ export default {
     quickOrderServiceFee: ORDER_SERVICE_FEE,
     showBirthdayModal: false,
     showSupportModal: false,
+    mobileMenuOpen: false,
+    logoMaskUrl: brandIconMaskDataUrl(),
+    logoMaskFailed: false,
+    restaurantsCache: [],
+    restaurantSearchTimer: null,
   }),
   computed: {
     supportInitialName() {
@@ -234,13 +271,22 @@ export default {
     groupedCart() {
       const groups = {};
       this.cartItems.forEach(item => {
-        const id = item.restaurantId || item.restaurant_id;
-        if (!groups[id]) {
-          const r = RESTAURANTS.find(r => r.id == id);
-          groups[id] = { id, name: r?.title || `Ресторан #${id}`, items: [], total: 0 };
+        const id = item.restaurantId || item.restaurant_id || null;
+        const nameFromItem = item.restaurant_title || item.restaurantTitle || item.restaurant_name || item.restaurantName || '';
+        const key = id ? String(id) : `name:${nameFromItem || 'unknown'}`;
+        if (!groups[key]) {
+          const titleFromDb = id ? this.restaurantsById.get(String(id)) : '';
+          const r = id ? RESTAURANTS.find(rest => rest.id == id) : null;
+          groups[key] = {
+            id: key,
+            routeRestaurantId: id ? Number(id) : null,
+            name: nameFromItem || titleFromDb || r?.title || (id ? `Ресторан #${id}` : 'Ресторан'),
+            items: [],
+            total: 0,
+          };
         }
-        groups[id].items.push(item);
-        groups[id].total += item.price * item.quantity;
+        groups[key].items.push(item);
+        groups[key].total += item.price * item.quantity;
       });
       return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
     },
@@ -287,9 +333,32 @@ export default {
     logoSrc() {
       return this.settings.logo_url || this.settings.logo_icon || '';
     },
+    brandIconStyle() {
+      return {
+        background: BRAND_GRADIENT_CSS,
+        WebkitMaskImage: cssMaskUrl(this.logoMaskUrl),
+        maskImage: cssMaskUrl(this.logoMaskUrl),
+      };
+    },
+    restaurantsById() {
+      const map = new Map();
+      for (const r of this.restaurantsCache) {
+        if (r?.id != null && r?.title) map.set(String(r.id), r.title);
+      }
+      return map;
+    },
   },
   methods: {
     formatDeliveryFee,
+    async preloadRestaurants() {
+      if (this.restaurantsCache.length) return;
+      try {
+        const { data } = await window.axios.get('/api/restaurants');
+        this.restaurantsCache = data || [];
+      } catch {
+        this.restaurantsCache = [];
+      }
+    },
     formatSearchRating(r) {
       const val = Number(r?.rating);
       return val > 0 ? val.toFixed(1) : 'Нет отзывов';
@@ -346,19 +415,25 @@ export default {
       } catch (err) { console.error('Ошибка загрузки иконок:', err); }
     },
     async searchRestaurants() {
-      if (!this.searchQuery.trim()) { this.filtered = []; this.showResults = false; return; }
-      try {
-        const { data } = await window.axios.get('/api/restaurants');
-        const q = this.searchQuery.trim().toLowerCase();
-        this.filtered = (data || [])
-          .filter(r => r.title?.toLowerCase().includes(q))
-          .sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0))
-          .slice(0, 5);
-      } catch {
-        const q = this.searchQuery.toLowerCase();
-        this.filtered = RESTAURANTS.filter(r => r.title.toLowerCase().includes(q)).slice(0, 5);
-      }
-      this.showResults = true;
+      if (this.restaurantSearchTimer) clearTimeout(this.restaurantSearchTimer);
+      this.restaurantSearchTimer = setTimeout(async () => {
+        if (!this.searchQuery.trim()) { this.filtered = []; this.showResults = false; return; }
+        try {
+          if (!this.restaurantsCache.length) {
+            const { data } = await window.axios.get('/api/restaurants');
+            this.restaurantsCache = data || [];
+          }
+          const q = this.searchQuery.trim().toLowerCase();
+          this.filtered = this.restaurantsCache
+            .filter(r => r.title?.toLowerCase().includes(q))
+            .sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0))
+            .slice(0, 5);
+        } catch {
+          const q = this.searchQuery.toLowerCase();
+          this.filtered = RESTAURANTS.filter(r => r.title.toLowerCase().includes(q)).slice(0, 5);
+        }
+        this.showResults = true;
+      }, 120);
     },
     hideResults() { setTimeout(() => this.showResults = false, 200); },
     goToRestaurant(id) { this.searchQuery = ''; this.showResults = false; router.visit(`/product/${id}`); },
@@ -468,14 +543,24 @@ export default {
       }
       router.visit('/check');
     },
+    onLogoMaskLoad(e) {
+      const src = e?.target?.currentSrc || e?.target?.src || this.logoSrc;
+      if (src) {
+        this.logoMaskFailed = false;
+        this.logoMaskUrl = src;
+      }
+    },
+    onLogoMaskError() {
+      this.logoMaskFailed = true;
+      this.logoMaskUrl = brandIconMaskDataUrl();
+    },
     onIconError(e) {
-      e.target.src = 'data:image/svg+xml,' + encodeURIComponent(
-        '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="45" fill="%23ff6b00"><rect width="50" height="45" rx="10"/><text x="25" y="28" text-anchor="middle" fill="white" font-size="18" font-weight="bold" font-family="sans-serif">FB</text></svg>'
-      );
+      e.target.src = brandIconSvgDataUrl();
     },
   },
   mounted() {
     this.loadSettings();
+    this.preloadRestaurants();
     this.checkAuth();
     this._onCartUpdate = () => this.bumpCart();
     window.addEventListener('cart-updated', this._onCartUpdate);
@@ -500,6 +585,12 @@ export default {
     document.addEventListener('keydown', this._esc);
   },
   watch: {
+    logoSrc(src) {
+      if (!src) {
+        this.logoMaskFailed = false;
+        this.logoMaskUrl = brandIconMaskDataUrl();
+      }
+    },
     groupedCart() {
       this.syncCartTabState();
     },
@@ -522,6 +613,70 @@ export default {
 @import "../assets/styles/header.css";
 
 .search-container { position: relative; flex: 1; max-width: 400px; }
+.brand-logo-link {
+  position: relative;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  margin-right: 16px;
+  flex-shrink: 0;
+}
+.brand-logo-icon {
+  width: 58px;
+  height: 58px;
+  flex-shrink: 0;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+.brand-logo-icon-probe {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.brand-logo-text {
+  white-space: nowrap;
+  line-height: 1;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  background: linear-gradient(135deg, #ffc46b 0%, #ff9f2f 35%, #ff6b00 65%, #e65100 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@media (max-width: 880px) {
+  .headerBody {
+    flex-wrap: wrap;
+    row-gap: 10px;
+    margin-top: 50px;
+  }
+  .search-container {
+    order: 2;
+    width: 100%;
+    max-width: none;
+  }
+  .headerNav {
+    order: 3;
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+@media (max-width: 640px) {
+  .brand-logo-icon { width: 48px; height: 48px; }
+  .brand-logo-text { font-size: 17px; }
+  .brand-logo-link { gap: 8px; margin-right: 8px; }
+  .search-container {
+    margin-top: 6px;
+  }
+}
 .search-input { width: 100%; padding: 12px 16px; border: 2px solid #eee; border-radius: 14px; font-size: 15px; transition: .2s; background: #fafafa; }
 .search-input:focus { outline: none; border-color: #ff6b00; background: #fff; box-shadow: 0 0 0 4px rgba(255,107,0,0.06); }
 .search-results { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 2px solid #eee; border-radius: 14px; margin-top: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); z-index: 1000; max-height: 300px; overflow-y: auto; }
@@ -531,6 +686,68 @@ export default {
 .restaurant-name { font-size: 15px; font-weight: 600; color: #1e1e1e; }
 .restaurant-rating { font-size: 13px; color: #ff6b00; font-weight: 600; }
 .search-no-results { padding: 16px; text-align: center; color: #999; font-size: 14px; }
+
+.burger-btn {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 2px solid #eee;
+  background: #fff;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  cursor: pointer;
+  transition: .2s;
+}
+.burger-btn span {
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: #333;
+}
+.burger-btn:hover {
+  border-color: var(--brand-solid);
+  box-shadow: 0 2px 10px var(--brand-shadow);
+}
+.header-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .burger-btn {
+    display: inline-flex;
+  }
+  .header-nav-links {
+    position: absolute;
+    right: 12px;
+    top: 90px;
+    flex-direction: column;
+    align-items: stretch;
+    background: #fff;
+    padding: 10px 10px 12px;
+    border-radius: 18px;
+    box-shadow: 0 10px 26px rgba(0,0,0,0.16);
+    min-width: 170px;
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition: .18s;
+    z-index: 110;
+  }
+  .header-nav-links--open {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  #headerCart {
+    width: 100%;
+    justify-content: center;
+  }
+}
 
 .empty-cart-icon { width: 120px; height: 100px; opacity: .6; margin-bottom: 16px; object-fit: contain; }
 

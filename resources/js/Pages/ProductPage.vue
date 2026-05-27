@@ -6,7 +6,7 @@
     </Head>
     <HeaderComponent />
     
-    <div class="container">
+    <div class="container restaurant-layout">
       <div class="ad">
         <!-- Заголовок ресторана -->
         <header class="page_header">
@@ -393,8 +393,8 @@ export default {
 .reviews-link {
   margin: 0;
   border: none;
-  background: #ff6b00;
-  color: #fff;
+  background: var(--brand-gradient);
+  color: #fff !important;
   border-radius: 40px;
   min-height: 40px;
   padding: 8px 18px;
@@ -405,7 +405,7 @@ export default {
   box-sizing: border-box;
   white-space: nowrap;
 }
-.reviews-link:hover { background: #e05e00; }
+.reviews-link:hover { filter: brightness(0.97); }
 .inline-icon { width: 16px; height: 16px; object-fit: contain; }
 
 .ad { flex: 1; min-width: 0; }
@@ -445,8 +445,8 @@ export default {
   flex-shrink: 0;
 }
 .back-btn:hover {
-  border-color: #ff6b00;
-  color: #ff6b00;
+  border-color: var(--brand-solid);
+  color: var(--brand-solid);
   background: #fff8f0;
 }
 
@@ -467,8 +467,8 @@ export default {
   transition: all 0.2s;
   white-space: nowrap;
 }
-.category-tab:hover { border-color: #ff6b00; color: #ff6b00; }
-.category-tab.active { background: #ff6b00; color: #fff; border-color: #ff6b00; }
+.category-tab:hover { border-color: var(--brand-solid); color: var(--brand-solid); }
+.category-tab.active { background: var(--brand-gradient); color: #fff; border-color: var(--brand-solid); }
 
 .category-title {
   font-size: 22px; font-weight: 700; color: #1e1e1e;
@@ -485,28 +485,28 @@ export default {
 .product-img-wrapper img { width: 100%; height: 100%; object-fit: cover; }
 .product-info { flex: 1; padding: 12px 14px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .product-info h4 { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: #1e1e1e; }
-.product-rating { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: #ff6b00; }
+.product-rating { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--brand-solid); }
 .description { color: #888; font-size: 13px; margin: 0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .dish-link { color: inherit; text-decoration: none; }
-.dish-link:hover { color: #ff6b00; }
-.calories-hint { font-size: 12px; color: #ff6b00; margin: 4px 0 0; font-weight: 600; }
+.dish-link:hover { color: var(--brand-solid); }
+.calories-hint { font-size: 12px; color: var(--brand-solid); margin: 4px 0 0; font-weight: 600; }
 .macros-hint { font-size: 11px; color: #999; margin: 2px 0 0; }
 .product-price { padding: 12px 14px 12px 0; flex-shrink: 0; }
 .price-cont { display: flex; align-items: center; gap: 8px; }
-.price { font-size: 17px; font-weight: 700; color: #ff6b00; white-space: nowrap; }
-.add-to-cart-btn { background: #ff6b00; color: #fff; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 20px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
-.add-to-cart-btn:hover { background: #e05e00; transform: scale(1.1); }
+.price { font-size: 17px; font-weight: 700; color: var(--brand-solid); white-space: nowrap; }
+.add-to-cart-btn { background: var(--brand-gradient); color: #fff; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 20px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
+.add-to-cart-btn:hover { filter: brightness(0.97); transform: scale(1.05); }
 .quantity-control { display: flex; align-items: center; gap: 6px; }
-.quantity-btn { background: #ff6b00; color: #fff; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: .2s; }
-.quantity-btn:hover { background: #e05e00; transform: scale(1.08); }
+.quantity-btn { background: var(--brand-gradient); color: #fff; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: .2s; }
+.quantity-btn:hover { filter: brightness(0.97); transform: scale(1.05); }
 .quantity-display { font-size: 15px; font-weight: 700; color: #1e1e1e; min-width: 22px; text-align: center; }
 .status-message { text-align: center; padding: 3rem; font-size: 18px; color: #666; }
 .status-message.error { color: #e74c3c; }
 .inline-icon { width: 16px; height: 16px; vertical-align: middle; display: inline; }
 
 @media (max-width: 900px) {
-  .container { flex-direction: column; padding: 1rem; }
-  .cart-wrapper { position: static; width: 100%; max-height: none; order: 1; }
+  .restaurant-layout { flex-direction: column; padding: 1rem; }
+  .cart-wrapper { position: static; width: 100%; max-height: none; order: 1; margin-top: 10px; }
   .ad { order: 0; }
   .restaurant-page-title { font-size: 1.5rem; }
   .product-img-wrapper { width: 90px; height: 90px; }

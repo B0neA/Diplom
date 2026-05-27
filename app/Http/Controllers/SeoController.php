@@ -76,7 +76,7 @@ class SeoController extends Controller
         return response($xml, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
     }
 
-    public function favicon()
+    public function favicon(): Response
     {
         $supabase = app(SupabaseService::class);
         $row = $supabase->get('site_settings', [

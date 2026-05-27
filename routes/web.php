@@ -16,6 +16,7 @@ use Inertia\Inertia;
 
 Route::get('/robots.txt', [SeoController::class, 'robots']);
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap']);
+Route::get('/favicon.svg', [SeoController::class, 'favicon']);
 Route::get('/favicon.ico', [SeoController::class, 'favicon']);
 
 Route::get('/', fn () => Inertia::render('HomePage'));
