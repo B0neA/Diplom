@@ -46,8 +46,26 @@
             </div>
             <div class="form-group">
               <label>Дата рождения</label>
-              <input v-model="birthDate" type="date" />
-              <p class="form-hint">В день рождения действует скидка 10% на заказ</p>
+              <input
+                v-if="!birthDateLocked"
+                v-model="birthDate"
+                type="date"
+                :max="todayDate"
+              />
+              <input
+                v-else
+                :value="formatBirthDate(savedBirthDate)"
+                type="text"
+                readonly
+                disabled
+                class="input-locked"
+              />
+              <p v-if="birthDateLocked" class="form-hint form-hint--locked">
+                Дата рождения установлена и не может быть изменена
+              </p>
+              <p v-else class="form-hint">
+                Указывается один раз. В день рождения действует скидка 10% на заказ
+              </p>
             </div>
 
             <h3 class="form-section-title">Способ оплаты</h3>
@@ -73,7 +91,7 @@
               </div>
             </div>
 
-            <button @click="saveProfile" class="save-btn" :disabled="saving">{{ saving ? 'Сохранение...' : 'Сохранить' }}</button>
+            <button @click="requestSaveProfile" class="save-btn" :disabled="saving">{{ saving ? 'Сохранение...' : 'Сохранить' }}</button>
           </div>
 
           <div class="profile-tabs">
@@ -125,6 +143,20 @@
                     </div>
                   </template>
                   <p v-else class="no-items">Состав заказа недоступен</p>
+                  <div v-if="getOrderItems(order).length" class="order-fees-summary">
+                    <div class="order-fee-row">
+                      <span>Блюда</span>
+                      <span>{{ orderItemsSubtotal(order) }} ₽</span>
+                    </div>
+                    <div class="order-fee-row">
+                      <span>Доставка</span>
+                      <span>{{ formatDeliveryFee(orderDeliveryFee(order)) }}</span>
+                    </div>
+                    <div class="order-fee-row">
+                      <span>Сервисный сбор</span>
+                      <span>{{ orderServiceFee }} ₽</span>
+                    </div>
+                  </div>
                 </div>
 
                 <p v-if="canModifyOrder(order)" class="order-window-hint">
@@ -145,9 +177,9 @@
                     type="button"
                     class="order-action-btn order-action-btn--cancel"
                     :disabled="orderActionLoading === order.id"
-                    @click="cancelOrder(order)"
+                    @click="askCancelOrder(order)"
                   >
-                    {{ orderActionLoading === order.id ? 'Отмена...' : 'Отменить заказ' }}
+                    Отменить заказ
                   </button>
                 </div>
                 <p v-else-if="order.status === 'new' && !canModifyOrder(order)" class="order-window-expired">
@@ -281,8 +313,19 @@
         </div>
 
         <div class="edit-order-totals">
-          <div>Блюда: {{ editItemsSubtotal }} ₽</div>
-          <div>Сервисный сбор: {{ orderServiceFee }} ₽</div>
+          <div class="order-fee-row">
+            <span>Блюда</span>
+            <span>{{ editItemsSubtotal }} ₽</span>
+          </div>
+          <div class="order-fee-row">
+            <span>Доставка</span>
+            <span :class="{ 'fee-free': editDeliveryFee === 0 }">{{ formatDeliveryFee(editDeliveryFee) }}</span>
+          </div>
+          <p v-if="editDeliveryHint" class="edit-delivery-hint">{{ editDeliveryHint }}</p>
+          <div class="order-fee-row">
+            <span>Сервисный сбор</span>
+            <span>{{ orderServiceFee }} ₽</span>
+          </div>
           <div class="edit-order-total">Итого: {{ editOrderTotal }} ₽</div>
         </div>
 
@@ -299,6 +342,60 @@
             {{ editOrderSaving ? 'Сохранение...' : 'Сохранить' }}
           </button>
         </div>
+      </div>
+    </div>
+
+    <div v-if="confirmCancelModal.show" class="confirm-modal-overlay" @click="confirmCancelModal.show = false">
+      <div class="confirm-modal" @click.stop>
+        <h3>Отменить заказ?</h3>
+        <p>Заказ №{{ confirmCancelModal.orderId }} будет отменён. После подтверждения средства вернутся на вашу карту в ближайшее время.</p>
+        <div class="confirm-modal-actions">
+          <button type="button" class="confirm-cancel" @click="confirmCancelModal.show = false">Назад</button>
+          <button
+            type="button"
+            class="confirm-danger"
+            :disabled="orderActionLoading === confirmCancelModal.orderId"
+            @click="performCancelOrder"
+          >
+            {{ orderActionLoading === confirmCancelModal.orderId ? 'Отмена...' : 'Да, отменить' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="orderNoticeModal.show" class="confirm-modal-overlay" @click="closeOrderNotice">
+      <div class="confirm-modal order-notice-modal" @click.stop>
+        <div class="notice-icon" :class="orderNoticeModal.variant">{{ orderNoticeModal.icon }}</div>
+        <h3>{{ orderNoticeModal.title }}</h3>
+        <p>{{ orderNoticeModal.message }}</p>
+        <button type="button" class="confirm-save notice-ok-btn" @click="closeOrderNotice">Понятно</button>
+      </div>
+    </div>
+
+    <div v-if="confirmBirthdayModal.show" class="confirm-modal-overlay" @click="confirmBirthdayModal.show = false">
+      <div class="confirm-modal" @click.stop>
+        <h3>Установить дату рождения?</h3>
+        <p>
+          Вы указываете дату: <strong>{{ formatBirthDate(confirmBirthdayModal.date) }}</strong>.
+        </p>
+        <p class="birthday-confirm-warning">
+          После сохранения изменить дату рождения будет невозможно. Проверьте, что дата указана верно.
+        </p>
+        <div class="confirm-modal-actions">
+          <button type="button" class="confirm-cancel" @click="confirmBirthdayModal.show = false">Изменить</button>
+          <button type="button" class="confirm-save" :disabled="saving" @click="confirmBirthdayAndSave">
+            {{ saving ? 'Сохранение...' : 'Подтвердить и сохранить' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="profileSavedModal.show" class="confirm-modal-overlay" @click="profileSavedModal.show = false">
+      <div class="confirm-modal order-notice-modal" @click.stop>
+        <div class="notice-icon success">✓</div>
+        <h3>Профиль сохранён</h3>
+        <p>Изменения успешно сохранены.</p>
+        <button type="button" class="confirm-save notice-ok-btn" @click="profileSavedModal.show = false">Понятно</button>
       </div>
     </div>
 
@@ -356,13 +453,14 @@ import {
   calcOrderTotal,
   ORDER_SERVICE_FEE,
 } from '../../orderUtils.js';
+import { calcDeliveryFee, formatDeliveryFee, amountUntilFreeDelivery } from '../../deliveryFee.js';
 import { loadSiteSettings, applySiteSettings } from '../../settingsCache.js';
 
 export default {
   name: 'ProfilePage',
   components: { HeaderComponent, Head, ReviewCardUser },
   setup() {
-    const seo = usePageSeo('Личный кабинет — FastBite', 'История заказов, адреса доставки, отзывы и настройки профиля FastBite.');
+    const seo = usePageSeo('Личный кабинет — Лопать Подано', 'История заказов, адреса доставки, отзывы и настройки профиля Лопать Подано.');
     return { seo };
   },
   data() {
@@ -378,7 +476,10 @@ export default {
       paymentExpiry: '',
       paymentCvc: '',
       birthDate: '',
+      savedBirthDate: '',
       editMode: false,
+      confirmBirthdayModal: { show: false, date: '' },
+      profileSavedModal: { show: false },
       showDeleteModal: false,
       deletingProfile: false,
       deletePassword: '',
@@ -411,11 +512,33 @@ export default {
       editOrderSaving: false,
       editOrderError: '',
       orderServiceFee: ORDER_SERVICE_FEE,
+      confirmCancelModal: { show: false, orderId: null },
+      orderNoticeModal: {
+        show: false,
+        variant: 'success',
+        icon: '✓',
+        title: '',
+        message: '',
+      },
     };
   },
   computed: {
+    birthDateLocked() {
+      return !!this.savedBirthDate;
+    },
+    todayDate() {
+      return new Date().toISOString().slice(0, 10);
+    },
     editItemsSubtotal() {
       return calcItemsTotal(this.editOrderForm.items);
+    },
+    editDeliveryFee() {
+      return calcDeliveryFee(this.editItemsSubtotal);
+    },
+    editDeliveryHint() {
+      const left = amountUntilFreeDelivery(this.editItemsSubtotal);
+      if (left <= 0) return '';
+      return `Добавьте блюд ещё на ${left} ₽ — доставка станет бесплатной`;
     },
     editOrderTotal() {
       return calcOrderTotal(this.editOrderForm.items);
@@ -612,7 +735,9 @@ export default {
       this.paymentCvc = profile?.payment_cvc
         ? String(profile.payment_cvc).replace(/\D/g, '').slice(0, 3)
         : '';
-      this.birthDate = profile?.birth_date ? String(profile.birth_date).slice(0, 10) : '';
+      const birth = profile?.birth_date ? String(profile.birth_date).slice(0, 10) : '';
+      this.savedBirthDate = birth;
+      this.birthDate = birth;
     },
     formatBirthDate(value) {
       if (!value) return '';
@@ -645,21 +770,40 @@ export default {
       });
       this.orders = data || [];
     },
-    async saveProfile() {
+    requestSaveProfile() {
+      if (!this.birthDateLocked && this.birthDate) {
+        this.confirmBirthdayModal = { show: true, date: this.birthDate };
+        return;
+      }
+      this.performSaveProfile();
+    },
+    confirmBirthdayAndSave() {
+      this.confirmBirthdayModal.show = false;
+      this.performSaveProfile();
+    },
+    buildProfilePayload() {
+      const payload = {
+        full_name: this.fullName,
+        phone: this.phone.replace(/\D/g, ''),
+        address: this.address.trim(),
+        payment_card: this.paymentCard.replace(/\D/g, ''),
+        payment_expiry: this.paymentExpiry,
+        payment_cvc: this.paymentCvc.replace(/\D/g, '').slice(0, 3),
+      };
+      if (!this.birthDateLocked && this.birthDate) {
+        payload.birth_date = this.birthDate;
+      }
+      return payload;
+    },
+    async performSaveProfile() {
       this.saving = true;
       try {
         const http = await getLaravelApi();
-        const payload = {
-          full_name: this.fullName,
-          phone: this.phone.replace(/\D/g, ''),
-          address: this.address.trim(),
-          payment_card: this.paymentCard.replace(/\D/g, ''),
-          payment_expiry: this.paymentExpiry,
-          payment_cvc: this.paymentCvc.replace(/\D/g, '').slice(0, 3),
-          birth_date: this.birthDate || null,
-        };
-        const { status } = await http.patch('/api/profile', payload);
-        if (status >= 400) throw new Error('save failed');
+        const payload = this.buildProfilePayload();
+        const { status, data } = await http.patch('/api/profile', payload);
+        if (status >= 400) {
+          throw new Error(data?.error || 'save failed');
+        }
 
         const authApi = await getAuthApi();
         try {
@@ -672,10 +816,10 @@ export default {
         const profile = await loadProfile(this.userId);
         const user = await getCurrentUser();
         if (user) this.applyProfile(profile, user);
-        alert('Профиль обновлён!');
+        this.profileSavedModal.show = true;
       } catch (e) {
         console.error(e);
-        alert('Ошибка сохранения профиля');
+        alert(e?.response?.data?.error || e?.message || 'Ошибка сохранения профиля');
       } finally {
         this.saving = false;
       }
@@ -699,27 +843,55 @@ export default {
       return secondsRemaining(order, this.nowTick);
     },
     formatCountdown,
+    formatDeliveryFee,
+    orderItemsSubtotal(order) {
+      return calcItemsTotal(parseOrderItems(order));
+    },
+    orderDeliveryFee(order) {
+      return calcDeliveryFee(this.orderItemsSubtotal(order));
+    },
     toggleOrder(id) {
       this.expandedOrders[id] = !this.expandedOrders[id];
     },
-    async cancelOrder(order) {
+    askCancelOrder(order) {
       if (!this.canModifyOrder(order)) {
         alert('Время на отмену истекло');
         return;
       }
-      if (!confirm(`Отменить заказ #${order.id}?`)) return;
-      this.orderActionLoading = order.id;
+      this.confirmCancelModal = { show: true, orderId: order.id };
+    },
+    async performCancelOrder() {
+      const orderId = this.confirmCancelModal.orderId;
+      const order = this.orders.find(o => o.id === orderId);
+      if (!order || !this.canModifyOrder(order)) {
+        this.confirmCancelModal.show = false;
+        alert('Время на отмену истекло');
+        return;
+      }
+      this.orderActionLoading = orderId;
       try {
         const http = await getLaravelApi();
-        const { data } = await http.post(`/api/profile/orders/${order.id}/cancel`);
+        const { data } = await http.post(`/api/profile/orders/${orderId}/cancel`);
         const updated = data?.order || { ...order, status: 'cancelled' };
-        this.orders = this.orders.map(o => (o.id === order.id ? { ...o, ...updated, status: 'cancelled' } : o));
-        alert('Заказ отменён');
+        this.orders = this.orders.map(o =>
+          (o.id === orderId ? { ...o, ...updated, status: 'cancelled' } : o)
+        );
+        this.confirmCancelModal.show = false;
+        this.orderNoticeModal = {
+          show: true,
+          variant: 'cancel',
+          icon: '↩',
+          title: 'Заказ отменён',
+          message: 'Средства вернутся на вашу карту в ближайшее время. Статус заказа обновлён в личном кабинете.',
+        };
       } catch (e) {
         alert(e?.response?.data?.error || 'Не удалось отменить заказ');
       } finally {
         this.orderActionLoading = null;
       }
+    },
+    closeOrderNotice() {
+      this.orderNoticeModal.show = false;
     },
     openEditOrder(order) {
       if (!this.canEditOrder(order)) {
@@ -779,7 +951,13 @@ export default {
           this.orders = this.orders.map(o => (o.id === order.id ? { ...o, ...updated } : o));
         }
         this.closeEditOrder();
-        alert('Заказ обновлён');
+        this.orderNoticeModal = {
+          show: true,
+          variant: 'success',
+          icon: '✓',
+          title: 'Заказ изменён',
+          message: 'Изменения сохранены. Сумма и состав заказа обновлены — доставка пересчитана автоматически.',
+        };
       } catch (e) {
         this.editOrderError = e?.response?.data?.error || 'Не удалось сохранить изменения';
       } finally {
@@ -874,6 +1052,17 @@ h1 { font-size: 28px; font-weight: 700; color: #1e1e1e; margin-bottom: 2rem; }
 .edit-form { background: #fff; border-radius: 20px; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 16px; }
 .form-section-title { margin: 8px 0 0; font-size: 16px; font-weight: 700; }
 .form-hint { margin: -8px 0 0; font-size: 13px; color: #999; }
+.form-hint--locked { color: #888; }
+.input-locked {
+  background: #f5f5f5;
+  color: #666;
+  cursor: not-allowed;
+}
+.birthday-confirm-warning {
+  color: #c0392b;
+  font-size: 14px;
+  line-height: 1.45;
+}
 .form-group { display: flex; flex-direction: column; gap: 6px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .payment-card-details .form-group input { width: 100%; box-sizing: border-box; }
@@ -927,6 +1116,42 @@ h1 { font-size: 28px; font-weight: 700; color: #1e1e1e; margin-bottom: 2rem; }
   border-bottom: 2px solid #ff6b00;
 }
 .order-item-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 8px 0; border-bottom: 1px solid #fafafa; font-size: 14px; }
+.order-fees-summary {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #eee;
+  font-size: 14px;
+  color: #666;
+}
+.order-fee-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+.order-fee-row .fee-free { color: #2e7d32; font-weight: 600; }
+.edit-delivery-hint {
+  font-size: 12px;
+  color: #ff6b00;
+  margin: 4px 0 8px;
+  line-height: 1.4;
+}
+.order-notice-modal { text-align: center; max-width: 400px; }
+.notice-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
+}
+.notice-icon.success { background: #e8f5e9; color: #2e7d32; }
+.notice-icon.cancel { background: #eef6ff; color: #2d6cdf; }
+.order-notice-modal h3 { margin: 0 0 10px; font-size: 20px; }
+.order-notice-modal p { margin: 0 0 20px; color: #666; line-height: 1.5; font-size: 15px; }
+.notice-ok-btn { width: 100%; }
 .order-restaurant-group .order-item-row:last-child { border-bottom: none; }
 .order-window-hint { margin: 12px 0 8px; font-size: 13px; color: #ff6b00; font-weight: 600; }
 .order-window-expired { margin: 12px 0 0; font-size: 13px; color: #999; }

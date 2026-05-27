@@ -98,6 +98,10 @@
                     <span>{{ selectedTotalPrice }} ₽</span>
                   </div>
                   <div class="cart-summary-row">
+                    <span>Доставка</span>
+                    <span>{{ formatDeliveryFee(quickOrderDeliveryFee) }}</span>
+                  </div>
+                  <div class="cart-summary-row">
                     <span>Сервисный сбор</span>
                     <span>{{ quickOrderServiceFee }} ₽</span>
                   </div>
@@ -174,6 +178,11 @@ import {
   markBirthdayModalShown,
   shouldShowBirthdayModal,
 } from '../js/birthdayDiscount.js';
+import {
+  calcDeliveryFee,
+  formatDeliveryFee,
+  ORDER_SERVICE_FEE,
+} from '../js/deliveryFee.js';
 
 
 const RESTAURANTS = [
@@ -203,7 +212,7 @@ export default {
     quickOrderNumber: '',
     quickOrderTotal: 0,
     userProfile: null,
-    quickOrderServiceFee: 50,
+    quickOrderServiceFee: ORDER_SERVICE_FEE,
     showBirthdayModal: false,
     showSupportModal: false,
   }),
@@ -253,8 +262,11 @@ export default {
     selectedTotalPrice() {
       return this.activeCartItems.reduce((t, i) => t + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0);
     },
+    quickOrderDeliveryFee() {
+      return calcDeliveryFee(this.selectedTotalPrice);
+    },
     quickOrderSubtotal() {
-      return this.selectedTotalPrice + this.quickOrderServiceFee;
+      return this.selectedTotalPrice + this.quickOrderDeliveryFee + this.quickOrderServiceFee;
     },
     birthdayDiscountAmount() {
       if (!this.userProfile?.birth_date || !isBirthdayToday(this.userProfile.birth_date)) {
@@ -277,6 +289,7 @@ export default {
     },
   },
   methods: {
+    formatDeliveryFee,
     formatSearchRating(r) {
       const val = Number(r?.rating);
       return val > 0 ? val.toFixed(1) : 'Нет отзывов';

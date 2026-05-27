@@ -18,7 +18,7 @@ export default {
   name: 'NotFoundPage',
   components: { HeaderComponent, Head },
   setup() {
-    const seo = usePageSeo('Страница не найдена — FastBite', 'Запрошенная страница не существует. Вернитесь на главную FastBite и выберите ресторан.');
+    const seo = usePageSeo('Страница не найдена — Лопать Подано', 'Запрошенная страница не существует. Вернитесь на главную Лопать Подано и выберите ресторан.');
     return { seo };
   },
 };

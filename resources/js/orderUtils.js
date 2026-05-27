@@ -1,5 +1,12 @@
+import {
+  ORDER_SERVICE_FEE,
+  calcDeliveryFee,
+  calcOrderTotalWithFees,
+} from './deliveryFee.js';
+
+export { ORDER_SERVICE_FEE, calcDeliveryFee, calcOrderTotalWithFees };
+
 const WINDOW_MS = 5 * 60 * 1000;
-export const ORDER_SERVICE_FEE = 50;
 
 export function parseOrderItems(order) {
   if (!order?.items) return [];
@@ -77,5 +84,5 @@ export function calcItemsTotal(items) {
 }
 
 export function calcOrderTotal(items) {
-  return calcItemsTotal(items) + ORDER_SERVICE_FEE;
+  return calcOrderTotalWithFees(calcItemsTotal(items));
 }

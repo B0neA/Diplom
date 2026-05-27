@@ -8,6 +8,7 @@ class OrderModificationService
 {
     public const WINDOW_MINUTES = 5;
 
+    /** @deprecated Используйте DeliveryFeeService::SERVICE_FEE */
     public const SERVICE_FEE = 50;
 
     public function parseItems(mixed $items): array
@@ -97,7 +98,9 @@ class OrderModificationService
 
     public function calcOrderTotal(array $items): int
     {
-        return $this->calcItemsTotal($items) + self::SERVICE_FEE;
+        $subtotal = $this->calcItemsTotal($items);
+
+        return app(DeliveryFeeService::class)->orderTotalForSubtotal($subtotal);
     }
 
     /**

@@ -408,7 +408,7 @@ const emptyRestaurantForm = () => ({
   title: '', rating: 4, img: '', delivery_time: 35, description: '',
 });
 
-const ARCHIVE_STORAGE_KEY = 'fastbite_admin_archive';
+const ARCHIVE_STORAGE_KEY = 'lopat_podano_admin_archive';
 
 export default {
   name: 'AdminDashboard',

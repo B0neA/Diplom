@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'fastbite_site_settings';
+const STORAGE_KEY = 'lopat_podano_site_settings';
 
 let memoryCache = null;
 

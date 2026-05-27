@@ -171,8 +171,8 @@ export default {
     pageSeo() {
       const name = this.product?.title || 'Меню ресторана';
       return usePageSeo(
-        `${name} — FastBite`,
-        `Меню «${name}»: закажите блюда с доставкой на дом через сервис FastBite.`
+        `${name} — Лопать Подано`,
+        `Меню «${name}»: закажите блюда с доставкой на дом через сервис Лопать Подано.`
       );
     },
     totalPrice() {

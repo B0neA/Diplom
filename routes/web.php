@@ -152,6 +152,24 @@ Route::prefix('api')->group(function () {
         $supabase = app(SupabaseService::class);
         $fields = $request->only(['full_name', 'phone', 'address', 'birth_date', 'payment_card', 'payment_expiry', 'payment_cvc']);
 
+        $profileResponse = $supabase->get('profiles', [
+            'id' => 'eq.' . $userId,
+            'select' => 'birth_date',
+        ]);
+        $existingBirthDate = null;
+        if ($profileResponse->successful()) {
+            $rows = $profileResponse->json();
+            $existingBirthDate = is_array($rows) && isset($rows[0]['birth_date'])
+                ? $rows[0]['birth_date']
+                : null;
+        }
+
+        if ($existingBirthDate) {
+            unset($fields['birth_date']);
+        } elseif (array_key_exists('birth_date', $fields) && empty($fields['birth_date'])) {
+            unset($fields['birth_date']);
+        }
+
         $response = $supabase->patch('profiles', $fields, ['id' => 'eq.' . $userId]);
 
         return response()->json($response->json(), $response->status());

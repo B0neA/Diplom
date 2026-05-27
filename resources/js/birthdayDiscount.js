@@ -1,4 +1,4 @@
-const MODAL_PREFIX = 'fastbite_birthday_modal_';
+const MODAL_PREFIX = 'lopat_podano_birthday_modal_';
 
 export const BIRTHDAY_DISCOUNT_PERCENT = 10;
 

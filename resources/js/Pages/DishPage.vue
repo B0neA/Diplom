@@ -122,7 +122,7 @@ export default {
   components: { HeaderComponent, Head, ReviewCardUser },
   props: { id: { type: Number, required: true } },
   setup() {
-    const seo = usePageSeo('Блюдо — FastBite', 'Состав, пищевая ценность и отзывы о блюде. Закажите доставку через FastBite.');
+    const seo = usePageSeo('Блюдо — Лопать Подано', 'Состав, пищевая ценность и отзывы о блюде. Закажите доставку через Лопать Подано.');
     return { seo };
   },
   data() {

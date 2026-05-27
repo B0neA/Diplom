@@ -6,8 +6,8 @@ import { loadSiteSettings, applySiteSettings } from '../settingsCache.js';
 import { usePageSeo } from '../usePageSeo.js';
 
 const seo = usePageSeo(
-  'FastBite — доставка еды за 30 минут',
-  'Закажите еду из лучших ресторанов с доставкой. Бесплатная доставка от 800 ₽, скидки и быстрый сервис FastBite.'
+  'Лопать Подано — доставка еды за 30 минут',
+  'Закажите еду из лучших ресторанов с доставкой. Бесплатная доставка от 800 ₽, скидки и быстрый сервис Лопать Подано.'
 );
 
 const settings = reactive({
@@ -55,7 +55,7 @@ const defaultFaq = [
   { id: 4, icon_key: 'reset_icon', question: 'Можно ли изменить или отменить заказ?', answer: 'Да, пока ресторан не начал готовить (первые 5 минут после оформления). В личном кабинете → Мои заказы → Отменить.' },
   { id: 5, icon_key: 'lock_icon', question: 'Зачем нужна регистрация?', answer: 'Чтобы сохранять историю заказов, адреса доставки и получать персональные скидки.' },
   { id: 6, icon_key: 'present_icon', question: 'Есть ли у вас промокоды и скидки?', answer: 'Да! Промокоды можно ввести при оформлении заказа. Попробуйте PIZZA20 (скидка 20% на первый заказ). Также дарим скидку 10% в День Рождения — она автоматически применяется к сумме блюд в ваш праздник!' },
-  { id: 7, icon_key: 'phone_icon', question: 'Как связаться с поддержкой?', answer: 'Email: support@fastbite.ru\nТелефон: +7 (800) 123-45-67 (ежедневно с 9:00 до 23:00)' },
+  { id: 7, icon_key: 'phone_icon', question: 'Как связаться с поддержкой?', answer: 'Email: support@lopatpodano.ru\nТелефон: +7 (800) 123-45-67 (ежедневно с 9:00 до 23:00)' },
   { id: 8, icon_key: 'shoppingbasket_icon', question: 'Почему некоторых ресторанов нет в списке?', answer: 'Рестораны могут быть временно недоступны или не работать в ваш район.' },
   { id: 9, icon_key: 'star_icon', question: 'Как оставить отзыв о ресторане?', answer: 'После получения заказа вам придёт ссылка на оценку в личном кабинете.' },
   { id: 10, icon_key: 'time_icon', question: 'В какое время работает доставка?', answer: 'С 9:00 до 23:00. Ночные заказы временно не принимаются.' },
@@ -159,7 +159,7 @@ onMounted(() => {
     </section>
 
     <section class="benefits">
-      <h2 class="benefits__title">Почему FastBite</h2>
+      <h2 class="benefits__title">Почему Лопать Подано</h2>
       <div class="benefits__grid">
         <div class="benefit-card">
           <img :src="settings.benefit_1_icon" alt="" class="benefit-icon" @error="onImageError" />

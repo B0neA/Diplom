@@ -158,8 +158,11 @@
               </div>
               <div class="price-row">
                 <span class="price-label">Доставка</span>
-                <span class="price-value">0 ₽</span>
+                <span class="price-value" :class="{ 'price-value--free': deliveryFee === 0 }">
+                  {{ formatDeliveryFee(deliveryFee) }}
+                </span>
               </div>
+              <p v-if="deliveryHint" class="delivery-hint">{{ deliveryHint }}</p>
               <div class="price-row">
                 <span class="price-label">Сервисный сбор</span>
                 <span class="price-value">{{ serviceFee }} ₽</span>
@@ -237,6 +240,12 @@ import {
   formatPhoneDisplay,
 } from '../supabase.js';
 import { getCart, saveCart, notifyCartChanged, syncCartWithAuth } from '../cart.js';
+import {
+  calcDeliveryFee,
+  amountUntilFreeDelivery,
+  formatDeliveryFee,
+  ORDER_SERVICE_FEE,
+} from '../deliveryFee.js';
 
 const RESTAURANTS = [
   { id: 1, title: 'KFC', rating: 4 }, { id: 2, title: 'Велопицца', rating: 5 },
@@ -256,7 +265,7 @@ export default {
   components: { HeaderComponent, Head, OrderSuccessModal, BirthdayDiscountModal },
   setup() {
     const seo = usePageSeo(
-      'Оформление заказа — FastBite',
+      'Оформление заказа — Лопать Подано',
       'Укажите адрес и способ оплаты, примените промокод и подтвердите доставку еды из выбранных ресторанов.'
     );
     return { seo };
@@ -276,7 +285,6 @@ export default {
       promoDiscount: 0,
       userBirthDate: null,
       showBirthdayModal: false,
-      serviceFee: 50,
       showOrderModal: false,
       orderNumber: '',
       authChecked: false,
@@ -334,12 +342,26 @@ export default {
       return this.activeItems.reduce((t, i) => t + i.price * i.quantity, 0);
     },
 
+    deliveryFee() {
+      return calcDeliveryFee(this.cartTotal);
+    },
+    deliveryHint() {
+      const left = amountUntilFreeDelivery(this.cartTotal);
+      if (left <= 0) return '';
+      return `Добавьте блюд ещё на ${left} ₽ — доставка будет бесплатной`;
+    },
+    serviceFee() {
+      return ORDER_SERVICE_FEE;
+    },
     birthdayDiscount() {
       if (!isBirthdayToday(this.userBirthDate)) return 0;
       return calcBirthdayDiscount(this.cartTotal);
     },
     finalTotal() {
-      return Math.max(0, this.cartTotal + this.serviceFee - this.birthdayDiscount - this.promoDiscount);
+      return Math.max(
+        0,
+        this.cartTotal + this.deliveryFee + this.serviceFee - this.birthdayDiscount - this.promoDiscount
+      );
     },
 
     isFormValid() {
@@ -355,6 +377,7 @@ export default {
   },
 
   methods: {
+    formatDeliveryFee,
     loadCart() {
       this.cartItems = [...getCart()];
     },
@@ -907,6 +930,16 @@ export default {
 .discount-label {
   font-size: 15px;
   color: #888;
+}
+.delivery-hint {
+  font-size: 12px;
+  color: #ff6b00;
+  margin: -4px 0 10px;
+  line-height: 1.4;
+}
+.price-value--free {
+  color: #2e7d32;
+  font-weight: 600;
 }
 .price-value,
 .discount-value {

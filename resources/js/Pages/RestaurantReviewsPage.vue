@@ -149,9 +149,9 @@ export default {
   },
   setup(props) {
     const title = props.initialRestaurantTitle
-      ? `Отзывы: ${props.initialRestaurantTitle} — FastBite`
-      : 'Отзывы о ресторане — FastBite';
-    const seo = usePageSeo(title, 'Читайте и оставляйте отзывы о ресторане и блюдах FastBite. Оценки помогают выбрать лучшее меню.');
+      ? `Отзывы: ${props.initialRestaurantTitle} — Лопать Подано`
+      : 'Отзывы о ресторане — Лопать Подано';
+    const seo = usePageSeo(title, 'Читайте и оставляйте отзывы о ресторане и блюдах Лопать Подано. Оценки помогают выбрать лучшее меню.');
     return { seo };
   },
   data() {

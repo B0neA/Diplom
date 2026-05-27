@@ -47,7 +47,7 @@ export default {
   name: 'ForgotPasswordPage',
   components: { Head },
   setup() {
-    const seo = usePageSeo('Забыли пароль — FastBite', 'Восстановите доступ к аккаунту FastBite по номеру телефона, указанному при регистрации.');
+    const seo = usePageSeo('Забыли пароль — Лопать Подано', 'Восстановите доступ к аккаунту Лопать Подано по номеру телефона, указанному при регистрации.');
     return { seo };
   },
   data() {
