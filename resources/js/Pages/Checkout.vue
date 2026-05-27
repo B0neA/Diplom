@@ -1,15 +1,46 @@
 <template>
   <div class="checkout-page">
+    <Head>
+      <title>{{ seo.title }}</title>
+      <meta name="description" :content="seo.description" />
+    </Head>
     <HeaderComponent />
     <div class="container">
       <div class="checkout-layout">
         <!-- Левая колонка - Состав заказа -->
         <div class="order-details-section">
           <h1 class="restaurant-title">Оформление заказа</h1>
+
+          <div v-if="groupedCartItems.length > 0" class="checkout-tabs-wrap">
+            <p class="checkout-tabs-hint">
+              {{ groupedCartItems.length > 1
+                ? 'Оформите заказ из всех ресторанов сразу или выберите один ресторан'
+                : 'Состав заказа' }}
+            </p>
+            <div class="checkout-tabs">
+              <button
+                v-if="groupedCartItems.length > 1"
+                type="button"
+                :class="['checkout-tab', { active: activeTab === 'all' }]"
+                @click="setActiveTab('all')"
+              >
+                Все рестораны
+              </button>
+              <button
+                v-for="group in groupedCartItems"
+                :key="group.id"
+                type="button"
+                :class="['checkout-tab', { active: String(activeTab) === String(group.id) }]"
+                @click="setActiveTab(group.id)"
+              >
+                {{ group.name }}
+              </button>
+            </div>
+          </div>
           
-          <div v-if="groupedCartItems.length > 0">
-            <div v-for="group in groupedCartItems" :key="group.id" class="restaurant-order-group">
-              <h3 class="restaurant-name">{{ group.name }}</h3>
+          <div v-if="displayedGroups.length > 0">
+            <div v-for="group in displayedGroups" :key="group.id" class="restaurant-order-group">
+              <h3 v-if="activeTab === 'all'" class="restaurant-name">{{ group.name }}</h3>
               <div class="restaurant-items">
                 <div v-for="item in group.items" :key="item.id" class="order-item-detail">
                   <div class="item-info">
@@ -24,6 +55,7 @@
               </div>
               <div class="restaurant-total">Итого по ресторану: {{ group.total }} ₽</div>
             </div>
+            <p v-if="activeTab !== 'all'" class="scope-note">Оформляется заказ только из «{{ activeTabName }}»</p>
           </div>
           
           <div v-else class="empty-cart">
@@ -39,6 +71,7 @@
             
             <div class="payment-section">
               <h3 class="payment-title">Способ оплаты</h3>
+              <p class="payment-hint">Данные карты подставляются из личного кабинета, их можно изменить</p>
               <div class="card-input-group">
                 <div class="card-input-wrapper">
                   <img 
@@ -85,12 +118,29 @@
                 <input type="text" class="form-input" v-model="customerName" placeholder="Ваше имя" />
               </div>
               <div class="form-group">
-                <label class="form-label">Телефон</label>
-                <input type="text" class="form-input" v-model="customerPhone" placeholder="+7 (___) ___-__-__" @input="formatPhone" />
+                <label class="form-label form-label--with-icon">
+                  <img v-if="settings.phone_icon" :src="settings.phone_icon" alt="" class="label-icon" @error="onFieldIconError" />
+                  Телефон
+                </label>
+                <input
+                  type="text"
+                  class="form-input"
+                  v-model="customerPhone"
+                  placeholder="+7 (___) ___-__-__"
+                  @input="formatPhone"
+                />
               </div>
               <div class="form-group">
-                <label class="form-label">Адрес доставки</label>
-                <input type="text" class="form-input" v-model="deliveryAddress" placeholder="Улица, дом, квартира" />
+                <label class="form-label form-label--with-icon">
+                  <img v-if="settings.location_icon" :src="settings.location_icon" alt="" class="label-icon" @error="onFieldIconError" />
+                  Адрес доставки
+                </label>
+                <input
+                  type="text"
+                  class="form-input"
+                  v-model="deliveryAddress"
+                  placeholder="Улица, дом, квартира"
+                />
               </div>
               <div class="form-group">
                 <label class="form-label">Комментарий к заказу</label>
@@ -118,9 +168,13 @@
                 <input type="text" class="promo-input" v-model="promoCode" placeholder="Промокод" />
                 <button class="apply-promo-button" @click="applyPromo">Применить</button>
               </div>
-              <div v-if="discount > 0" class="discount-row">
-                <span class="discount-label">Скидка</span>
-                <span class="discount-value">-{{ discount }} ₽</span>
+              <div v-if="birthdayDiscount > 0" class="discount-row discount-row--birthday">
+                <span class="discount-label">Скидка в честь дня рождения (−10%)</span>
+                <span class="discount-value">-{{ birthdayDiscount }} ₽</span>
+              </div>
+              <div v-if="promoDiscount > 0" class="discount-row">
+                <span class="discount-label">Промокод</span>
+                <span class="discount-value">-{{ promoDiscount }} ₽</span>
               </div>
             </div>
 
@@ -133,8 +187,8 @@
               </div>
               <div class="action-buttons">
                 <button class="clear-cart-button" @click="clearCartAndRedirect">Очистить корзину</button>
-                <button class="pay-button" @click="submitOrder" :disabled="!isFormValid">
-                  Оплатить {{ finalTotal }} ₽
+                <button class="pay-button" @click="submitOrder" :disabled="!isFormValid || submitting || !authChecked || !activeItems.length">
+                  {{ submitting ? 'Оформление...' : `Оплатить ${finalTotal} ₽` }}
                 </button>
               </div>
               <p class="agreement-text">
@@ -147,55 +201,42 @@
       </div>
     </div>
 
-    <!-- Модальное окно -->
-    <div v-if="showOrderModal" class="order-modal-overlay" @click="closeModal">
-      <div class="order-modal" @click.stop>
-        <div class="modal-header">
-          <h3>Заказ оформлен!</h3>
-          <button class="close-modal-btn" @click="closeModal">×</button>
-        </div>
-        <div class="modal-content">
-          <img 
-            :src="settings.success_icon" 
-            alt="Success" 
-            class="success-icon" 
-            @error="onIconError($event, 'success')" 
-          />
-          <p class="modal-message">Ваш заказ успешно оформлен и ожидает подтверждения</p>
-          <div class="order-info">
-            <div class="info-row">
-              <span class="info-label">Номер заказа:</span>
-              <span class="info-value">#{{ orderNumber }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Сумма:</span>
-              <span class="info-value">{{ finalTotal }} ₽</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Статус:</span>
-              <span class="status-badge">Ожидает подтверждения</span>
-            </div>
-          </div>
-          <p class="modal-note">Мы свяжемся с вами для подтверждения заказа в течение 15 минут</p>
-          <button class="back-to-home-button" @click="goToHome">Вернуться на главную</button>
-        </div>
-      </div>
-    </div>
+    <OrderSuccessModal
+      :show="showOrderModal"
+      :order-number="orderNumber"
+      :total="finalTotal"
+      :success-icon="settings.success_icon"
+      @close="closeModal"
+      @go-home="goToHome"
+    />
+
+    <BirthdayDiscountModal :show="showBirthdayModal" @close="closeBirthdayModal" />
   </div>
 </template>
 
 <script>
 import { router } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
 import HeaderComponent from '../../Components/HeaderComponent.vue';
-import axios from 'axios';
-
-const api = axios.create({
-  baseURL: 'https://cuibxmcjdkgjffmmzwgd.supabase.co/rest/v1',
-  headers: {
-    apikey: 'sb_publishable_5BPLZkbZvQXw7ZfrMWufFA_K77_nZxh',
-    Authorization: 'Bearer sb_publishable_5BPLZkbZvQXw7ZfrMWufFA_K77_nZxh',
-  },
-});
+import { usePageSeo } from '../usePageSeo.js';
+import OrderSuccessModal from '../../Components/OrderSuccessModal.vue';
+import BirthdayDiscountModal from '../../Components/BirthdayDiscountModal.vue';
+import { loadSiteSettings, applySiteSettings } from '../settingsCache.js';
+import {
+  calcBirthdayDiscount,
+  isBirthdayToday,
+  markBirthdayModalShown,
+  shouldShowBirthdayModal,
+} from '../birthdayDiscount.js';
+import {
+  api,
+  getCurrentUser,
+  getCurrentSession,
+  loadProfile,
+  formatPhoneInput,
+  formatPhoneDisplay,
+} from '../supabase.js';
+import { getCart, saveCart, notifyCartChanged, syncCartWithAuth } from '../cart.js';
 
 const RESTAURANTS = [
   { id: 1, title: 'KFC', rating: 4 }, { id: 2, title: 'Велопицца', rating: 5 },
@@ -212,8 +253,14 @@ const RESTAURANTS = [
 
 export default {
   name: 'CheckoutPage',
-  components: { HeaderComponent },
-  
+  components: { HeaderComponent, Head, OrderSuccessModal, BirthdayDiscountModal },
+  setup() {
+    const seo = usePageSeo(
+      'Оформление заказа — FastBite',
+      'Укажите адрес и способ оплаты, примените промокод и подтвердите доставку еды из выбранных ресторанов.'
+    );
+    return { seo };
+  },
   data() {
     return {
       cartItems: [],
@@ -226,13 +273,21 @@ export default {
       cardExpiry: '',
       cardCvc: '',
       promoCode: '',
-      discount: 0,
+      promoDiscount: 0,
+      userBirthDate: null,
+      showBirthdayModal: false,
       serviceFee: 50,
       showOrderModal: false,
       orderNumber: '',
+      authChecked: false,
+      userId: null,
+      submitting: false,
+      activeTab: 'all',
       settings: {
         card_icon: '',
         success_icon: '',
+        location_icon: '',
+        phone_icon: '',
       },
     };
   },
@@ -257,12 +312,34 @@ export default {
       return Object.values(groups);
     },
 
-    cartTotal() {
-      return this.cartItems.reduce((t, i) => t + i.price * i.quantity, 0);
+    displayedGroups() {
+      if (this.activeTab === 'all') return this.groupedCartItems;
+      return this.groupedCartItems.filter(g => String(g.id) === String(this.activeTab));
     },
 
+    activeTabName() {
+      if (this.activeTab === 'all') return 'Все рестораны';
+      const g = this.groupedCartItems.find(x => String(x.id) === String(this.activeTab));
+      return g?.name || '';
+    },
+
+    activeItems() {
+      if (this.activeTab === 'all') return this.cartItems;
+      return this.cartItems.filter(
+        i => String(i.restaurantId || i.restaurant_id) === String(this.activeTab)
+      );
+    },
+
+    cartTotal() {
+      return this.activeItems.reduce((t, i) => t + i.price * i.quantity, 0);
+    },
+
+    birthdayDiscount() {
+      if (!isBirthdayToday(this.userBirthDate)) return 0;
+      return calcBirthdayDiscount(this.cartTotal);
+    },
     finalTotal() {
-      return Math.max(0, this.cartTotal + this.serviceFee - this.discount);
+      return Math.max(0, this.cartTotal + this.serviceFee - this.birthdayDiscount - this.promoDiscount);
     },
 
     isFormValid() {
@@ -279,10 +356,15 @@ export default {
 
   methods: {
     loadCart() {
+      this.cartItems = [...getCart()];
+    },
+
+    async loadRestaurantsFromApi() {
       try {
-        this.cartItems = JSON.parse(localStorage.getItem('shoppingCart') || '[]');
+        const { data } = await window.axios.get('/api/restaurants');
+        if (data?.length) this.restaurants = data;
       } catch {
-        this.cartItems = [];
+        /* fallback RESTAURANTS */
       }
     },
 
@@ -299,43 +381,145 @@ export default {
     },
 
     formatPhone() {
-      let n = this.customerPhone.replace(/\D/g, '').slice(0, 11);
-      if (n.startsWith('8')) n = '7' + n.slice(1);
-      if (n.startsWith('9') && n.length === 10) n = '7' + n;
-      this.customerPhone = n.length
-        ? `+7 (${n.slice(1, 4)}) ${n.slice(4, 7)}-${n.slice(7, 9)}-${n.slice(9, 11)}`
-        : '';
+      this.customerPhone = formatPhoneInput(this.customerPhone);
     },
 
-    applyPromo() {
-      const code = this.promoCode.toUpperCase();
-      if (code === 'PIZZA20') {
-        this.discount = Math.floor(this.cartTotal * 0.2);
-        alert('Скидка 20%!');
-      } else if (code === 'FREE50') {
-        this.discount = 50;
-        alert('Скидка 50₽!');
-      } else if (code) {
-        alert('Промокод не найден');
+    setActiveTab(tab) {
+      this.activeTab = tab;
+      this.promoDiscount = 0;
+      this.promoCode = '';
+    },
+
+    initCheckoutTab() {
+      const groups = this.groupedCartItems;
+      if (!groups.length) {
+        this.activeTab = 'all';
+        return;
+      }
+      if (groups.length === 1) {
+        this.activeTab = groups[0].id;
+        return;
+      }
+      if (this.activeTab === 'all') return;
+      if (!groups.find(g => String(g.id) === String(this.activeTab))) {
+        this.activeTab = 'all';
+      }
+    },
+
+    async checkAuthAndLoadProfile() {
+      const session = await getCurrentSession();
+      const user = session?.user ?? (await getCurrentUser());
+      if (!user) {
+        window.location.href = '/auth?redirect=/check';
+        return;
+      }
+      this.userId = user.id;
+      this.authChecked = true;
+      const profile = await loadProfile(user.id);
+      if (profile) {
+        this.customerName = profile.full_name || user.user_metadata?.full_name || '';
+        this.customerPhone = formatPhoneDisplay(profile.phone || user.user_metadata?.phone);
+        this.deliveryAddress = profile.address || '';
+        if (profile.payment_card) {
+          const digits = String(profile.payment_card).replace(/\D/g, '').slice(0, 16);
+          this.cardNumber = Array.from({ length: Math.ceil(digits.length / 4) }, (_, i) =>
+            digits.slice(i * 4, i * 4 + 4)
+          ).join(' ');
+        }
+        if (profile.payment_expiry) {
+          this.cardExpiry = profile.payment_expiry;
+        }
+        if (profile.payment_cvc) {
+          this.cardCvc = String(profile.payment_cvc).replace(/\D/g, '').slice(0, 3);
+        }
+        this.userBirthDate = profile.birth_date || null;
+        this.tryShowBirthdayModal();
+      } else {
+        this.customerName = user.user_metadata?.full_name || '';
+        this.customerPhone = formatPhoneDisplay(user.user_metadata?.phone);
+      }
+    },
+
+    tryShowBirthdayModal() {
+      if (!this.userId || !this.userBirthDate) return;
+      if (!shouldShowBirthdayModal(this.userId, this.userBirthDate)) return;
+      this.showBirthdayModal = true;
+    },
+    closeBirthdayModal() {
+      this.showBirthdayModal = false;
+      if (this.userId) markBirthdayModalShown(this.userId);
+    },
+    async applyPromo() {
+      const code = this.promoCode.trim();
+      if (!code) return;
+      try {
+        const { data } = await window.axios.post('/api/promo/validate', {
+          code,
+          cartTotal: this.cartTotal,
+          userId: this.userId || null,
+        });
+        this.promoDiscount = Number(data.discount) || 0;
+        alert(data.message || 'Промокод применён');
+      } catch (e) {
+        this.promoDiscount = 0;
+        alert(e?.response?.data?.error || 'Промокод не найден');
       }
     },
 
     clearCartAndRedirect() {
       if (confirm('Очистить корзину?')) {
-        localStorage.removeItem('shoppingCart');
+        saveCart([]);
+        notifyCartChanged();
         this.cartItems = [];
         router.visit('/restaurans');
       }
     },
 
-    submitOrder() {
+    async submitOrder() {
       if (!this.isFormValid) {
         alert('Заполните все поля');
         return;
       }
-      this.orderNumber = 'ORD' + Date.now().toString().slice(-8);
-      this.showOrderModal = true;
-      localStorage.removeItem('shoppingCart');
+      if (!this.activeItems.length) {
+        alert('Нет позиций для оформления');
+        return;
+      }
+      this.submitting = true;
+      const scopeComment = this.activeTab === 'all'
+        ? this.orderComment
+        : `[${this.activeTabName}] ${this.orderComment}`.trim();
+      try {
+        const payload = {
+          customerName: this.customerName,
+          customerPhone: this.customerPhone.replace(/\D/g, ''),
+          deliveryAddress: this.deliveryAddress,
+          orderComment: scopeComment,
+          total: this.finalTotal,
+          items: this.activeItems,
+          userId: this.userId,
+        };
+        if (this.activeTab !== 'all') {
+          payload.restaurantId = this.activeTab;
+        }
+        const { data } = await window.axios.post('/api/orders', payload);
+        const created = Array.isArray(data) ? data[0] : data;
+        this.orderNumber = created?.id ? String(created.id) : 'ORD' + Date.now().toString().slice(-8);
+        this.showOrderModal = true;
+        if (this.activeTab === 'all') {
+          saveCart([]);
+          this.cartItems = [];
+        } else {
+          const orderedIds = new Set(this.activeItems.map(i => i.id));
+          this.cartItems = this.cartItems.filter(i => !orderedIds.has(i.id));
+          saveCart(this.cartItems);
+        }
+        notifyCartChanged();
+      } catch (e) {
+        alert('Не удалось оформить заказ. Попробуйте снова.');
+        console.error(e);
+      } finally {
+        this.submitting = false;
+      }
     },
 
     closeModal() {
@@ -349,13 +533,8 @@ export default {
 
     async loadSettings() {
       try {
-        const { data } = await api.get('/site_settings', {
-          params: { id: 'eq.1', select: 'card_icon,success_icon' },
-        });
-        if (data?.[0]) {
-          if (data[0].card_icon) this.settings.card_icon = data[0].card_icon;
-          if (data[0].success_icon) this.settings.success_icon = data[0].success_icon;
-        }
+        const data = await loadSiteSettings();
+        applySiteSettings(this.settings, data);
       } catch (err) {
         console.error('Ошибка загрузки иконок:', err);
       }
@@ -364,14 +543,27 @@ export default {
     onIconError(e, type) {
       const fallbacks = {
         card: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="20" height="16" rx="2" stroke="%23999" stroke-width="2"/><line x1="2" y1="10" x2="22" y2="10" stroke="%23999" stroke-width="2"/></svg>'),
-        success: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="32" fill="%23ff6b00"/><path d="M18 32L27 41L46 22" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'),
       };
       e.target.src = fallbacks[type] || '';
     },
+
+    onFieldIconError(e) {
+      e.target.style.display = 'none';
+    },
   },
 
-  mounted() {
+  watch: {
+    groupedCartItems() {
+      this.initCheckoutTab();
+    },
+  },
+
+  async mounted() {
+    await this.checkAuthAndLoadProfile();
+    await syncCartWithAuth();
+    await this.loadRestaurantsFromApi();
     this.loadCart();
+    this.initCheckoutTab();
     this.loadSettings();
   },
 };
@@ -413,6 +605,55 @@ export default {
   margin: 0 0 20px;
   padding-bottom: 15px;
   border-bottom: 2px solid #f0f0f0;
+}
+
+.checkout-tabs-wrap {
+  margin-bottom: 20px;
+}
+
+.checkout-tabs-hint {
+  font-size: 14px;
+  color: #888;
+  margin: 0 0 12px;
+}
+
+.checkout-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.checkout-tab {
+  padding: 10px 18px;
+  border: 2px solid #eee;
+  border-radius: 40px;
+  background: #fafafa;
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.checkout-tab:hover {
+  border-color: #ff6b00;
+  color: #ff6b00;
+}
+
+.checkout-tab.active {
+  background: #ff6b00;
+  border-color: #ff6b00;
+  color: #fff;
+}
+
+.scope-note {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: #fff8f0;
+  border-radius: 12px;
+  font-size: 14px;
+  color: #e65100;
+  font-weight: 500;
 }
 
 /* Пустая корзина */
@@ -533,6 +774,12 @@ export default {
   margin-bottom: 15px;
 }
 
+.payment-hint {
+  font-size: 13px;
+  color: #888;
+  margin: -8px 0 12px;
+}
+
 /* Поле карты */
 .card-input-group {
   display: flex;
@@ -603,6 +850,34 @@ export default {
   color: #888;
   margin-bottom: 6px;
   font-weight: 500;
+}
+.form-label--with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.label-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+.input-with-icon {
+  position: relative;
+}
+.field-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  pointer-events: none;
+  opacity: 0.75;
+  z-index: 1;
+}
+.form-input--with-icon {
+  padding-left: 44px;
 }
 .form-input,
 .form-textarea {
@@ -753,125 +1028,6 @@ export default {
 }
 .agreement-link:hover {
   text-decoration: underline;
-}
-
-/* Модальное окно */
-.order-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(5px);
-}
-.order-modal {
-  background: #fff;
-  border-radius: 24px;
-  width: 90%;
-  max-width: 480px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  overflow: hidden;
-}
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 25px;
-  background: #ff6b00;
-  color: #fff;
-}
-.modal-header h3 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-}
-.close-modal-btn {
-  background: none;
-  border: none;
-  color: #fff;
-  font-size: 28px;
-  cursor: pointer;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.modal-content {
-  padding: 30px;
-  text-align: center;
-}
-.success-icon {
-  width: 64px;
-  height: 64px;
-  object-fit: contain;
-  margin: 0 auto 20px;
-  display: block;
-}
-.modal-message {
-  font-size: 18px;
-  color: #1e1e1e;
-  margin-bottom: 25px;
-  font-weight: 500;
-}
-.order-info {
-  background: #fefaf5;
-  border-radius: 14px;
-  padding: 20px;
-  margin-bottom: 25px;
-  text-align: left;
-}
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-.info-row:last-child {
-  border-bottom: none;
-}
-.info-label {
-  font-size: 14px;
-  color: #888;
-  font-weight: 500;
-}
-.info-value {
-  font-size: 16px;
-  color: #1e1e1e;
-  font-weight: 700;
-}
-.status-badge {
-  display: inline-block;
-  padding: 6px 14px;
-  background: #fff3e0;
-  color: #e65100;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-}
-.modal-note {
-  font-size: 14px;
-  color: #888;
-  margin: 20px 0;
-}
-.back-to-home-button {
-  width: 100%;
-  padding: 15px;
-  background: #ff6b00;
-  color: #fff;
-  border: none;
-  border-radius: 14px;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: 0.2s;
-}
-.back-to-home-button:hover {
-  background: #e05e00;
-  transform: translateY(-2px);
 }
 
 @media (max-width: 768px) {

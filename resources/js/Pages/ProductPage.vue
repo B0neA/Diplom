@@ -1,5 +1,9 @@
 <template>
   <div>
+    <Head>
+      <title>{{ pageSeo.title }}</title>
+      <meta name="description" :content="pageSeo.description" />
+    </Head>
     <HeaderComponent />
     
     <div class="container">
@@ -7,12 +11,23 @@
         <!-- Заголовок ресторана -->
         <header class="page_header">
           <div v-if="product">
-            <h2>{{ product.title }}</h2>
-            <p>
-              <img :src="settings.star_icon" class="inline-icon" /> {{ product.rating }} · 
-              <img :src="settings.time_icon" class="inline-icon" /> 30-45 мин · 
-              <img :src="settings.delivery_icon" class="inline-icon" /> Бесплатная доставка от 800 ₽
-            </p>
+            <h1 class="restaurant-page-title">{{ product.title }}</h1>
+            <div class="header-meta-row">
+              <p>
+                <img v-if="settings.star_icon" :src="settings.star_icon" class="inline-icon" alt="" />
+                <span v-else class="inline-icon">★</span>
+                {{ displayRating }}
+                <span class="meta-sep">·</span>
+                <img v-if="settings.time_icon" :src="settings.time_icon" class="inline-icon" alt="" />
+                <span v-else class="inline-icon">🕐</span>
+                {{ formatDelivery(product) }}
+                <span class="meta-sep">·</span>
+                <img v-if="settings.delivery_icon" :src="settings.delivery_icon" class="inline-icon" alt="" />
+                <span v-else class="inline-icon">🛵</span>
+                {{ product.free_delivery_text || 'Бесплатная доставка от 800 ₽' }}
+              </p>
+              <button type="button" class="reviews-link" @click="goToRestaurantReviews">Отзывы ресторана</button>
+            </div>
           </div>
           <div v-else-if="loading" class="status-message">Загрузка...</div>
           <div v-else class="status-message error">Ресторан не найден</div>
@@ -55,8 +70,15 @@
                     />
                   </div>
                   <div class="product-info">
-                    <h4>{{ item.name }}</h4>
+                    <h4>
+                      <a href="#" class="dish-link" @click.prevent="goToDish(item.id)">{{ item.name }}</a>
+                    </h4>
+                    <p v-if="productRating(item)" class="product-rating">★ {{ productRating(item) }}</p>
                     <p class="description">{{ item.description }}</p>
+                    <p v-if="item.calories" class="calories-hint">{{ item.calories }} ккал</p>
+                    <p v-if="item.proteins != null || item.fats != null || item.carbs != null" class="macros-hint">
+                      Б {{ item.proteins ?? '—' }} · Ж {{ item.fats ?? '—' }} · У {{ item.carbs ?? '—' }}
+                    </p>
                   </div>
                   <div class="product-price">
                     <div class="price-cont">
@@ -98,10 +120,19 @@
 </template>
 
 <script>
+import { Head } from '@inertiajs/vue3';
 import HeaderComponent from '../../Components/HeaderComponent.vue';
 import CartComponent from '../../Components/CartComponent.vue';
 import { router } from '@inertiajs/vue3';
+import { usePageSeo } from '../usePageSeo.js';
 import axios from 'axios';
+import {
+  getCart,
+  saveCart,
+  notifyCartChanged,
+  syncCartWithAuth,
+} from '../cart.js';
+import { getCurrentUser } from '../supabase.js'; // checkout only
 
 const api = axios.create({
   baseURL: 'https://cuibxmcjdkgjffmmzwgd.supabase.co/rest/v1',
@@ -114,9 +145,8 @@ const api = axios.create({
 
 export default {
   name: 'ProductPage',
-  components: { HeaderComponent, CartComponent },
+  components: { HeaderComponent, CartComponent, Head },
   props: ['id'],
-  
   data() {
     return {
       loading: true,
@@ -138,6 +168,13 @@ export default {
   },
 
   computed: {
+    pageSeo() {
+      const name = this.product?.title || 'Меню ресторана';
+      return usePageSeo(
+        `${name} — FastBite`,
+        `Меню «${name}»: закажите блюда с доставкой на дом через сервис FastBite.`
+      );
+    },
     totalPrice() {
       return this.cartItems.reduce((t, i) => t + i.price * i.quantity, 0);
     },
@@ -151,33 +188,36 @@ export default {
       });
       return groups;
     },
+    displayRating() {
+      const r = Number(this.product?.rating);
+      return r > 0 ? r.toFixed(1) : 'Нет отзывов';
+    },
   },
 
   methods: {
     async loadSettings() {
       try {
-        const { data } = await api.get('/site_settings', {
-          params: { id: 'eq.1', select: '*' },
-        });
-        if (data?.[0]) {
-          Object.keys(data[0]).forEach(key => {
-            if (data[0][key] && data[0][key] !== '') {
-              this.settings[key] = data[0][key];
-            }
-          });
-        }
+        const { loadSiteSettings, applySiteSettings } = await import('../settingsCache.js');
+        applySiteSettings(this.settings, await loadSiteSettings());
       } catch (err) {
         console.error('Ошибка загрузки настроек:', err);
       }
     },
 
+    formatDelivery(r) {
+      if (!r) return '—';
+      if (r.delivery_time != null && !Number.isNaN(Number(r.delivery_time))) {
+        return `${r.delivery_time} мин`;
+      }
+      if (r.delivery_time) return String(r.delivery_time);
+      return '30–45 мин';
+    },
+
     async loadRestaurant() {
       this.loading = true;
       try {
-        const { data } = await api.get('/restaurants', { 
-          params: { id: `eq.${this.id}`, select: '*' } 
-        });
-        this.product = data?.[0] || null;
+        const { data } = await window.axios.get(`/api/restaurants/${this.id}`);
+        this.product = data || null;
       } catch {
         this.error = 'Не удалось загрузить ресторан';
       } finally {
@@ -185,18 +225,18 @@ export default {
       }
     },
 
+    productRating(item) {
+      const r = Number(item?.rating);
+      if (r > 0) return r.toFixed(1);
+      return '';
+    },
+
     async loadProducts() {
       this.loadingProducts = true;
       try {
-        const { data } = await api.get('/products', {
-          params: { 
-            restaurant_id: `eq.${this.id}`, 
-            select: '*', 
-            order: 'category.asc,name.asc' 
-          },
-        });
+        const { data } = await window.axios.get(`/api/restaurants/${this.id}/products`);
         this.restaurantProducts = data || [];
-        const cats = [...new Set(data.map(i => i.category).filter(Boolean))];
+        const cats = [...new Set((data || []).map(i => i.category).filter(Boolean))];
         this.categories = cats;
         if (cats.length > 0) this.activeCategory = cats[0];
       } catch {
@@ -205,7 +245,6 @@ export default {
         this.loadingProducts = false;
       }
     },
-
     scrollToCategory(cat) {
       this.activeCategory = cat;
       const el = this.categoryRefs[cat];
@@ -218,42 +257,80 @@ export default {
     goToRestaurants() {
       router.visit('/restaurans');
     },
+    goToRestaurantReviews() {
+      router.visit(`/restaurant/${this.id}/reviews`);
+    },
 
     getCartQuantity(id) {
       return this.cartItems.find(i => i.id === id)?.quantity || 0;
     },
 
     addToCart(product) {
+      const restaurantId = product.restaurant_id || product.restaurantId || this.id;
       const item = this.cartItems.find(i => i.id === product.id);
       if (item) item.quantity++;
-      else this.cartItems.push({ ...product, quantity: 1, restaurantId: product.restaurant_id || product.restaurantId || this.id });
+      else this.cartItems.push({ ...product, quantity: 1, restaurantId });
+      this.persistCart();
+    },
+    persistCart() {
+      saveCart(this.cartItems);
+      notifyCartChanged();
+    },
+    refreshCart() {
+      this.cartItems = [...getCart()];
     },
 
     decreaseCartQuantity(product) {
       const item = this.cartItems.find(i => i.id === product.id);
       if (!item) return;
-      item.quantity > 1 ? item.quantity-- : this.removeItem(item);
+      if (item.quantity > 1) {
+        item.quantity--;
+        this.persistCart();
+      } else {
+        this.removeItem(item);
+      }
     },
 
-    increaseQuantity(item) { item.quantity++; },
-    decreaseQuantity(item) { item.quantity > 1 ? item.quantity-- : this.removeItem(item); },
+    increaseQuantity(item) {
+      item.quantity++;
+      this.persistCart();
+    },
+    decreaseQuantity(item) {
+      item.quantity > 1 ? item.quantity-- : this.removeItem(item);
+    },
     
     removeItem(item) {
       const idx = this.cartItems.findIndex(i => i.id === item.id);
       if (idx !== -1) this.cartItems.splice(idx, 1);
+      this.persistCart();
     },
 
-    clearCart() { this.cartItems = []; },
+    clearCart() {
+      this.cartItems = [];
+      this.persistCart();
+    },
     
     clearRestaurantCart(id) {
       if (confirm('Очистить корзину этого ресторана?')) {
-        this.cartItems = this.cartItems.filter(i => i.restaurant_id !== id);
+        this.cartItems = this.cartItems.filter(
+          i => (i.restaurantId || i.restaurant_id) !== id
+        );
+        this.persistCart();
       }
     },
 
-    checkout() {
+    async checkout() {
       if (!this.cartItems.length) return alert('Корзина пуста!');
+      const user = await getCurrentUser();
+      if (!user) {
+        router.visit('/auth?redirect=/check');
+        return;
+      }
       router.visit('/check');
+    },
+
+    goToDish(id) {
+      router.visit(`/dish/${id}`);
     },
 
     onProductImageError(e) {
@@ -264,16 +341,15 @@ export default {
   },
 
   async mounted() {
+    await syncCartWithAuth();
     await Promise.all([this.loadSettings(), this.loadRestaurant(), this.loadProducts()]);
-    try { this.cartItems = JSON.parse(localStorage.getItem('shoppingCart') || '[]'); } 
-    catch { this.cartItems = []; }
+    this.refreshCart();
+    this._onCartUpdate = () => this.refreshCart();
+    window.addEventListener('cart-updated', this._onCartUpdate);
   },
 
-  watch: {
-    cartItems: {
-      handler(c) { localStorage.setItem('shoppingCart', JSON.stringify(c)); },
-      deep: true,
-    },
+  beforeUnmount() {
+    window.removeEventListener('cart-updated', this._onCartUpdate);
   },
 };
 </script>
@@ -297,12 +373,40 @@ export default {
   text-align: center;
   margin-bottom: 1.5rem;
 }
-.page_header h2 { margin: 0 0 12px; font-size: 2rem; font-weight: 700; color: #1e1e1e; }
+.restaurant-page-title { margin: 0 0 12px; font-size: 2rem; font-weight: 700; color: #1e1e1e; }
+.header-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
 .page_header p {
-  display: inline-flex; align-items: center; gap: 12px;
+  display: inline-flex; align-items: center; gap: 8px;
+  margin: 0;
+  min-height: 40px;
   padding: 8px 20px; border: 2px solid #ff6b00; border-radius: 40px;
   font-size: 14px; font-weight: 500; color: #ff6b00; background: #fff8f0;
+  box-sizing: border-box;
 }
+.meta-sep { opacity: 0.6; }
+.reviews-link {
+  margin: 0;
+  border: none;
+  background: #ff6b00;
+  color: #fff;
+  border-radius: 40px;
+  min-height: 40px;
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+.reviews-link:hover { background: #e05e00; }
+.inline-icon { width: 16px; height: 16px; object-fit: contain; }
 
 .ad { flex: 1; min-width: 0; }
 
@@ -381,7 +485,12 @@ export default {
 .product-img-wrapper img { width: 100%; height: 100%; object-fit: cover; }
 .product-info { flex: 1; padding: 12px 14px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .product-info h4 { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: #1e1e1e; }
+.product-rating { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: #ff6b00; }
 .description { color: #888; font-size: 13px; margin: 0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.dish-link { color: inherit; text-decoration: none; }
+.dish-link:hover { color: #ff6b00; }
+.calories-hint { font-size: 12px; color: #ff6b00; margin: 4px 0 0; font-weight: 600; }
+.macros-hint { font-size: 11px; color: #999; margin: 2px 0 0; }
 .product-price { padding: 12px 14px 12px 0; flex-shrink: 0; }
 .price-cont { display: flex; align-items: center; gap: 8px; }
 .price { font-size: 17px; font-weight: 700; color: #ff6b00; white-space: nowrap; }
@@ -399,7 +508,7 @@ export default {
   .container { flex-direction: column; padding: 1rem; }
   .cart-wrapper { position: static; width: 100%; max-height: none; order: 1; }
   .ad { order: 0; }
-  .page_header h2 { font-size: 1.5rem; }
+  .restaurant-page-title { font-size: 1.5rem; }
   .product-img-wrapper { width: 90px; height: 90px; }
   .categories-row { flex-wrap: wrap; }
 }

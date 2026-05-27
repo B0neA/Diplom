@@ -1,152 +1,187 @@
 <?php
 
+use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\ProfileOrderController;
+use App\Http\Controllers\Api\ProfileReviewController;
+use App\Http\Controllers\Api\PublicApiController;
+use App\Http\Controllers\SeoController;
+use App\Services\RestaurantRatingService;
+use App\Services\SupabaseService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
-|
-*/
+Route::get('/robots.txt', [SeoController::class, 'robots']);
+Route::get('/sitemap.xml', [SeoController::class, 'sitemap']);
+Route::get('/favicon.ico', [SeoController::class, 'favicon']);
 
-// Страница-лендинг
-Route::get('/', function () {
-    return Inertia::render('HomePage');
+Route::get('/', fn () => Inertia::render('HomePage'));
+
+Route::get('/auth', fn () => Inertia::render('Auth/AuthPage'))->name('auth');
+Route::get('/forgot-password', fn () => Inertia::render('Auth/ForgotPasswordPage'))->name('auth.forgot');
+
+Route::get('/restaurans', fn () => Inertia::render('ProductsView'));
+
+Route::get('/product/{id}', fn ($id) => Inertia::render('ProductPage', ['id' => (int) $id]));
+Route::get('/restaurant/{id}/reviews', function ($id) {
+    $supabase = app(SupabaseService::class);
+    $row = $supabase->get('restaurants', [
+        'id' => 'eq.' . (int) $id,
+        'select' => 'id,title,name',
+    ])->json()[0] ?? null;
+    $title = trim((string) ($row['title'] ?? $row['name'] ?? ''));
+
+    return Inertia::render('RestaurantReviewsPage', [
+        'id' => (int) $id,
+        'initialRestaurantTitle' => $title ?: null,
+    ]);
 });
 
-Route::get('/auth', function () {
-    return Inertia::render('Auth/AuthPage');
-})->name('auth');
+Route::get('/dish/{id}', fn ($id) => Inertia::render('DishPage', ['id' => (int) $id]));
 
-// Главная со списком ресторанов (бывшая главная)
-Route::get('/restaurans', function () {
-    return Inertia::render('ProductsView');
-});
+Route::get('/check', fn () => Inertia::render('Checkout'));
 
-// Страница меню ресторана
-Route::get('/product/{id}', function ($id) {
-    return Inertia::render('ProductPage', ['id' => (int) $id]);
-});
+Route::get('/profile', fn () => Inertia::render('Auth/ProfilePage'))->name('profile');
 
-// Оформление заказа
-Route::get('/check', function () {
-    return Inertia::render('Checkout');
-});
+Route::get('/admin', fn () => Inertia::render('Admin/Dashboard'))->name('admin.dashboard');
 
-// Страница профиля (если нужна)
-Route::get('/profile', function () {
-    return Inertia::render('Auth/ProfilePage');
-})->name('profile');
-
-// Страница "О нас" (если нужна)
-Route::get('/about', function () {
-    return Inertia::render('AboutPage');
-})->name('about');
-
-// Страница контактов (если нужна)
-Route::get('/contacts', function () {
-    return Inertia::render('ContactsPage');
-})->name('contacts');
-
-// Админ-панель (если нужна)
-Route::get('/admin', function () {
-    return Inertia::render('Admin/Dashboard');
-})->name('admin.dashboard');
-
-// API-маршруты для работы с Supabase (опционально, через Laravel-сервис)
 Route::prefix('api')->group(function () {
-    
-    // Получить список ресторанов
-    Route::get('/restaurants', function () {
-        $supabase = app(\App\Services\SupabaseService::class);
-        $response = $supabase->from('restaurants')
-            ->select('*')
-            ->order('rating', 'desc')
-            ->get();
-        return response()->json($response->json());
+    Route::get('/site-settings', [PublicApiController::class, 'siteSettings']);
+    Route::get('/restaurants', [PublicApiController::class, 'restaurants']);
+    Route::get('/restaurants/{id}', [PublicApiController::class, 'restaurant']);
+    Route::get('/restaurants/{id}/reviews-page', [PublicApiController::class, 'reviewsPageData']);
+
+    Route::get('/restaurants/{id}/products', [PublicApiController::class, 'restaurantProducts']);
+    Route::get('/products/{id}', [PublicApiController::class, 'product']);
+    Route::get('/products/{id}/reviews', [PublicApiController::class, 'productReviews']);
+    Route::get('/restaurants/{id}/product-reviews', [PublicApiController::class, 'restaurantProductReviews']);
+    Route::get('/restaurants/{id}/reviews', function ($id) {
+        $supabase = app(SupabaseService::class);
+        return response()->json($supabase->get('restaurant_reviews', [
+            'restaurant_id' => 'eq.' . $id,
+            'select' => '*',
+            'order' => 'created_at.desc',
+        ])->json());
+    });
+    Route::post('/restaurants/{id}/reviews', [PublicApiController::class, 'storeRestaurantReview']);
+    Route::post('/reviews', [PublicApiController::class, 'storeProductReview']);
+
+    Route::post('/orders', function (Request $request) {
+        $supabase = app(SupabaseService::class);
+        $payload = [
+            'customer_name' => $request->input('customerName'),
+            'customer_phone' => $request->input('customerPhone'),
+            'delivery_address' => $request->input('deliveryAddress'),
+            'comment' => $request->input('orderComment'),
+            'total_amount' => $request->input('total'),
+            'items' => $request->input('items'),
+            'status' => 'new',
+        ];
+        if ($request->filled('userId')) {
+            $payload['user_id'] = $request->input('userId');
+        }
+        if ($request->filled('restaurantId')) {
+            $payload['restaurant_id'] = $request->input('restaurantId');
+        }
+        $response = $supabase->post('orders', $payload);
+        return response()->json($response->json(), $response->status());
     });
 
-    // Получить конкретный ресторан
-    Route::get('/restaurants/{id}', function ($id) {
-        $supabase = app(\App\Services\SupabaseService::class);
-        $response = $supabase->from('restaurants')
-            ->select('*')
-            ->eq('id', $id)
-            ->single()
-            ->get();
-        return response()->json($response->json());
+    Route::post('/promo/validate', [PublicApiController::class, 'validatePromo']);
+    Route::post('/auth/forgot-password/check', [AuthController::class, 'forgotPasswordCheck']);
+    Route::post('/auth/forgot-password/reset', [AuthController::class, 'resetPasswordByPhone']);
+
+    Route::post('/support', [PublicApiController::class, 'storeSupport']);
+
+    Route::post('/feedback', function (Request $request) {
+        $supabase = app(SupabaseService::class);
+        $response = $supabase->post('feedback_messages', [
+            'name' => $request->input('name'),
+            'email' => $request->input('email'),
+            'message' => $request->input('message'),
+        ]);
+        return response()->json($response->json(), $response->status());
     });
 
-    // Получить продукты ресторана
-    Route::get('/restaurants/{id}/products', function ($id) {
-        $supabase = app(\App\Services\SupabaseService::class);
-        $response = $supabase->from('products')
-            ->select('*')
-            ->eq('restaurant_id', $id)
-            ->order('name', 'asc')
-            ->get();
-        return response()->json($response->json());
+    Route::get('/faq', function () {
+        $supabase = app(SupabaseService::class);
+        return response()->json($supabase->get('faq', [
+            'is_active' => 'eq.true',
+            'select' => '*',
+            'order' => 'sort_order.asc',
+        ])->json());
     });
 
-    // Поиск ресторанов
-    Route::get('/search/restaurants', function (\Illuminate\Http\Request $request) {
-        $query = $request->get('q', '');
-        $supabase = app(\App\Services\SupabaseService::class);
-        $response = $supabase->from('restaurants')
-            ->select('*')
-            ->ilike('title', "%$query%")
-            ->limit(10)
-            ->get();
-        return response()->json($response->json());
+    Route::post('/profile/orders/{id}/cancel', [ProfileOrderController::class, 'cancel']);
+    Route::patch('/profile/orders/{id}', [ProfileOrderController::class, 'update']);
+
+    Route::get('/profile/reviews', [ProfileReviewController::class, 'index']);
+    Route::patch('/profile/reviews/{id}', [ProfileReviewController::class, 'updateProductReview']);
+    Route::delete('/profile/reviews/{id}', [ProfileReviewController::class, 'deleteProductReview']);
+    Route::patch('/profile/restaurant-reviews/{id}', [ProfileReviewController::class, 'updateRestaurantReview']);
+    Route::delete('/profile/restaurant-reviews/{id}', [ProfileReviewController::class, 'deleteRestaurantReview']);
+
+    Route::delete('/profile', [ProfileController::class, 'destroy']);
+
+    Route::patch('/profile', function (Request $request) {
+        $token = $request->bearerToken();
+        if (!$token) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $url = rtrim(env('SUPABASE_URL', 'https://cuibxmcjdkgjffmmzwgd.supabase.co'), '/');
+        $anon = env('SUPABASE_ANON_KEY', 'sb_publishable_5BPLZkbZvQXw7ZfrMWufFA_K77_nZxh');
+
+        $userResponse = Http::withHeaders([
+            'apikey' => $anon,
+            'Authorization' => 'Bearer ' . $token,
+        ])->get($url . '/auth/v1/user');
+
+        if (!$userResponse->successful()) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $userId = $userResponse->json()['id'] ?? null;
+        if (!$userId) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $supabase = app(SupabaseService::class);
+        $fields = $request->only(['full_name', 'phone', 'address', 'birth_date', 'payment_card', 'payment_expiry', 'payment_cvc']);
+
+        $response = $supabase->patch('profiles', $fields, ['id' => 'eq.' . $userId]);
+
+        return response()->json($response->json(), $response->status());
     });
 
-    // Поиск продуктов
-    Route::get('/search/products', function (\Illuminate\Http\Request $request) {
-        $query = $request->get('q', '');
-        $supabase = app(\App\Services\SupabaseService::class);
-        $response = $supabase->from('products')
-            ->select('*')
-            ->ilike('name', "%$query%")
-            ->limit(20)
-            ->get();
-        return response()->json($response->json());
-    });
-
-    // Создать заказ
-    Route::post('/orders', function (\Illuminate\Http\Request $request) {
-        $supabase = app(\App\Services\SupabaseService::class);
-        $response = $supabase->from('orders')
-            ->insert([
-                'customer_name' => $request->customerName,
-                'customer_phone' => $request->customerPhone,
-                'delivery_address' => $request->deliveryAddress,
-                'comment' => $request->orderComment,
-                'total_amount' => $request->total,
-                'items' => json_encode($request->items),
-                'status' => 'new',
-                'created_at' => now()->toIso8601String(),
-            ]);
-        return response()->json($response->json());
-    });
-
-    // Получить заказы пользователя
-    Route::get('/orders/{phone}', function ($phone) {
-        $supabase = app(\App\Services\SupabaseService::class);
-        $response = $supabase->from('orders')
-            ->select('*')
-            ->eq('customer_phone', $phone)
-            ->order('created_at', 'desc')
-            ->get();
-        return response()->json($response->json());
-    });
+    Route::get('/admin/restaurants', [AdminController::class, 'restaurants']);
+    Route::post('/admin/restaurants', [AdminController::class, 'storeRestaurant']);
+    Route::patch('/admin/restaurants/{id}', [AdminController::class, 'updateRestaurant']);
+    Route::delete('/admin/restaurants/{id}', [AdminController::class, 'deleteRestaurant']);
+    Route::post('/admin/restaurants/{id}/restore', [AdminController::class, 'restoreRestaurant']);
+    Route::get('/admin/orders', [AdminController::class, 'orders']);
+    Route::patch('/admin/orders/{id}', [AdminController::class, 'updateOrder']);
+    Route::delete('/admin/orders/{id}', [AdminController::class, 'deleteOrder']);
+    Route::post('/admin/orders/{id}/restore', [AdminController::class, 'restoreOrder']);
+    Route::get('/admin/products', [AdminController::class, 'products']);
+    Route::post('/admin/products', [AdminController::class, 'storeProduct']);
+    Route::patch('/admin/products/{id}', [AdminController::class, 'updateProduct']);
+    Route::delete('/admin/products/{id}', [AdminController::class, 'deleteProduct']);
+    Route::post('/admin/products/{id}/restore', [AdminController::class, 'restoreProduct']);
+    Route::get('/admin/archive', [AdminController::class, 'archiveItems']);
+    Route::get('/admin/restorable', [AdminController::class, 'restorableItems']);
+    Route::get('/admin/feedback', [AdminController::class, 'feedback']);
+    Route::delete('/admin/feedback/{id}', [AdminController::class, 'deleteFeedback']);
+    Route::get('/admin/support', [AdminController::class, 'supportRequests']);
+    Route::delete('/admin/support/{id}', [AdminController::class, 'deleteSupportRequest']);
+    Route::get('/admin/reviews', [AdminController::class, 'reviewsGrouped']);
+    Route::patch('/admin/reviews/{id}', [AdminController::class, 'updateReview']);
+    Route::delete('/admin/reviews/{id}', [AdminController::class, 'deleteReview']);
+    Route::patch('/admin/restaurant-reviews/{id}', [AdminController::class, 'updateRestaurantReview']);
+    Route::delete('/admin/restaurant-reviews/{id}', [AdminController::class, 'deleteRestaurantReview']);
 });
 
-// Fallback — все остальные запросы на главную
-Route::fallback(function () {
-    return Inertia::render('ProductsView');
-});
+Route::fallback(fn () => Inertia::render('NotFoundPage'));

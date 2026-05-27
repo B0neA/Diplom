@@ -1,8 +1,16 @@
 <script setup>
 import HeaderComponent from '../../Components/HeaderComponent.vue';
 import { router } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
 import { ref, reactive, watch, onMounted } from 'vue';
+import { loadSiteSettings, applySiteSettings } from '../settingsCache.js';
+import { usePageSeo } from '../usePageSeo.js';
 import axios from 'axios';
+
+const seo = usePageSeo(
+  'Рестораны — FastBite',
+  'Выберите ресторан для доставки еды. Сортировка по рейтингу, времени доставки и названию на FastBite.'
+);
 
 const api = axios.create({
   baseURL: 'https://cuibxmcjdkgjffmmzwgd.supabase.co/rest/v1',
@@ -32,28 +40,50 @@ const settings = reactive({
 
 const loadSettings = async () => {
   try {
-    const { data } = await api.get('/site_settings', {
-      params: { id: 'eq.1', select: '*' },
-    });
-    if (data?.[0]) {
-      Object.keys(data[0]).forEach(key => {
-        if (data[0][key] !== null && data[0][key] !== undefined) {
-          settings[key] = data[0][key];
-        }
-      });
-    }
+    const data = await loadSiteSettings();
+    applySiteSettings(settings, data);
   } catch (err) {
     console.error('Ошибка загрузки настроек:', err);
   }
+};
+
+const parseDeliveryMinutes = (r) => {
+  if (r.delivery_time != null && !Number.isNaN(Number(r.delivery_time))) {
+    return Number(r.delivery_time);
+  }
+  const match = String(r.delivery_time || '').match(/(\d+)/);
+  return match ? Number(match[1]) : 999;
+};
+
+const formatDelivery = (r) => {
+  if (r.delivery_time != null && !Number.isNaN(Number(r.delivery_time))) {
+    return `${r.delivery_time} мин`;
+  }
+  if (r.delivery_time) return String(r.delivery_time);
+  return '30–45 мин';
+};
+
+const sortRestaurants = (list) => {
+  const sorted = [...list];
+  const dir = sortOrder.value === 'asc' ? 1 : -1;
+  sorted.sort((a, b) => {
+    if (sortBy.value === 'title') {
+      return dir * a.title.localeCompare(b.title, 'ru');
+    }
+    if (sortBy.value === 'delivery_time') {
+      return dir * (parseDeliveryMinutes(a) - parseDeliveryMinutes(b));
+    }
+    return dir * ((Number(a.rating) || 0) - (Number(b.rating) || 0));
+  });
+  return sorted;
 };
 
 const loadRestaurants = async () => {
   loading.value = true;
   error.value = null;
   try {
-    const params = { select: '*', order: `${sortBy.value}.${sortOrder.value}` };
-    const { data } = await api.get('/restaurants', { params });
-    restaurants.value = data || [];
+    const { data } = await window.axios.get('/api/restaurants');
+    restaurants.value = sortRestaurants(data || []);
   } catch (err) {
     error.value = 'Не удалось загрузить рестораны.';
   } finally { loading.value = false; }
@@ -61,6 +91,11 @@ const loadRestaurants = async () => {
 
 const isGrid = () => view.value === 'grid';
 const goToRestaurant = (id) => router.visit(`/product/${id}`);
+const goToRestaurantReviews = (id) => router.visit(`/restaurant/${id}/reviews`);
+const displayRating = (r) => {
+  const val = Number(r.rating);
+  return val > 0 ? val.toFixed(1) : 'Нет отзывов';
+};
 const applyFilters = () => loadRestaurants();
 const resetFilters = () => {
   sortBy.value = 'rating';
@@ -68,8 +103,27 @@ const resetFilters = () => {
   loadRestaurants();
 };
 
-const onIconError = (e) => {
-  e.target.style.display = 'none';
+const iconFallbacks = {
+  sort_desc: '↓',
+  sort_asc: '↑',
+  list: '☰',
+  grid: '▦',
+  reset: '↺',
+  close: '×',
+};
+
+const hasIcon = (key) => Boolean(settings[key]);
+
+const onIconError = (e, key) => {
+  const el = e.target;
+  el.style.display = 'none';
+  const parent = el.parentElement;
+  if (parent && !parent.querySelector('.icon-fallback')) {
+    const span = document.createElement('span');
+    span.className = 'icon-fallback';
+    span.textContent = iconFallbacks[key] || '•';
+    parent.appendChild(span);
+  }
 };
 
 const onImageError = (e) => {
@@ -89,9 +143,14 @@ onMounted(() => {
 </script>
 
 <template>
+  <Head>
+    <title>{{ seo.title }}</title>
+    <meta name="description" :content="seo.description" />
+  </Head>
   <HeaderComponent />
   <section class="page">
     <div class="content-container">
+      <h1 class="page-title">Рестораны</h1>
       <!-- ФИЛЬТРЫ -->
       <div class="filters">
         <div class="filters__row">
@@ -108,16 +167,17 @@ onMounted(() => {
               :class="['filter-btn', 'filter-btn--sort', { 'filter-btn--active': sortOrder === 'desc' }]"
               title="По убыванию"
             >
-              <img :src="settings.sort_desc_icon" class="btn-icon" @error="onIconError" />
+              <img v-if="hasIcon('sort_desc_icon')" :src="settings.sort_desc_icon" class="btn-icon" @error="onIconError($event, 'sort_desc')" />
+              <span v-else class="icon-fallback">↓</span>
             </button>
             
-            <!-- Кнопка сортировки по возрастанию (↑) -->
             <button 
               @click="sortOrder = 'asc'"
               :class="['filter-btn', 'filter-btn--sort', { 'filter-btn--active': sortOrder === 'asc' }]"
               title="По возрастанию"
             >
-              <img :src="settings.sort_asc_icon" class="btn-icon" @error="onIconError" />
+              <img v-if="hasIcon('sort_asc_icon')" :src="settings.sort_asc_icon" class="btn-icon" @error="onIconError($event, 'sort_asc')" />
+              <span v-else class="icon-fallback">↑</span>
             </button>
           </div>
           
@@ -128,13 +188,19 @@ onMounted(() => {
               class="filter-btn" 
               :title="view === 'grid' ? 'Список' : 'Сетка'"
             >
-              <img v-if="view === 'grid'" :src="settings.list_icon" class="btn-icon" @error="onIconError" />
-              <img v-else :src="settings.grid_icon" class="btn-icon" @error="onIconError" />
+              <template v-if="view === 'grid'">
+                <img v-if="hasIcon('list_icon')" :src="settings.list_icon" class="btn-icon" @error="onIconError($event, 'list')" />
+                <span v-else class="icon-fallback">☰</span>
+              </template>
+              <template v-else>
+                <img v-if="hasIcon('grid_icon')" :src="settings.grid_icon" class="btn-icon" @error="onIconError($event, 'grid')" />
+                <span v-else class="icon-fallback">▦</span>
+              </template>
             </button>
             
-            <!-- Кнопка сброса -->
             <button @click="resetFilters" class="filter-btn filter-btn--reset" title="Сбросить фильтры">
-              <img :src="settings.reset_icon" class="btn-icon" @error="onIconError" />
+              <img v-if="hasIcon('reset_icon')" :src="settings.reset_icon" class="btn-icon" @error="onIconError($event, 'reset')" />
+              <span v-else class="icon-fallback">↺</span>
             </button>
           </div>
         </div>
@@ -146,14 +212,16 @@ onMounted(() => {
           <span v-if="sortBy !== 'rating'" class="active-tag">
             {{ sortBy === 'title' ? 'По названию' : 'По доставке' }}
             <button @click="sortBy = 'rating'" class="tag-close">
-              <img :src="settings.close_icon" class="tag-icon" @error="onIconError" />
+              <img v-if="hasIcon('close_icon')" :src="settings.close_icon" class="tag-icon" @error="onIconError($event, 'close')" />
+              <span v-else class="tag-icon-text">×</span>
             </button>
           </span>
           
           <span v-if="sortOrder !== 'desc'" class="active-tag">
             По возрастанию
             <button @click="sortOrder = 'desc'" class="tag-close">
-              <img :src="settings.close_icon" class="tag-icon" @error="onIconError" />
+              <img v-if="hasIcon('close_icon')" :src="settings.close_icon" class="tag-icon" @error="onIconError($event, 'close')" />
+              <span v-else class="tag-icon-text">×</span>
             </button>
           </span>
           
@@ -179,9 +247,10 @@ onMounted(() => {
             <h3>{{ r.title }}</h3>
             <div class="rating-row">
               <span class="star">★</span>
-              <span class="rating-value">{{ r.rating }}</span>
-              <span class="delivery-time">30-45 мин</span>
+              <span class="rating-value">{{ displayRating(r) }}</span>
+              <span class="delivery-time">{{ formatDelivery(r) }}</span>
             </div>
+            <button class="review-page-btn" @click.stop="goToRestaurantReviews(r.id)">Отзывы ресторана</button>
           </div>
         </article>
       </div>
@@ -191,6 +260,12 @@ onMounted(() => {
 
 <style scoped>
 /* ========== БАЗА ========== */
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin: 0 0 1.25rem;
+  color: #1e1e1e;
+}
 .page {
   background: #fefaf5;
   min-height: 100vh;
@@ -312,6 +387,24 @@ onMounted(() => {
   width: 20px;
   height: 20px;
   object-fit: contain;
+  display: block;
+}
+
+.icon-fallback {
+  font-size: 18px;
+  font-weight: 700;
+  color: #666;
+  line-height: 1;
+}
+
+.filter-btn--active .icon-fallback {
+  color: #ff6b00;
+}
+
+.tag-icon-text {
+  font-size: 14px;
+  color: #ff6b00;
+  font-weight: 700;
 }
 
 /* ========== АКТИВНЫЕ ФИЛЬТРЫ ========== */
@@ -459,6 +552,18 @@ onMounted(() => {
   padding: 4px 10px;
   border-radius: 20px;
 }
+.review-page-btn {
+  margin-top: 10px;
+  border: none;
+  border-radius: 24px;
+  background: #fff8f0;
+  color: #ff6b00;
+  font-weight: 600;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.review-page-btn:hover { background: #ffe8d1; }
 
 /* ========== СТАТУСЫ ========== */
 .status {

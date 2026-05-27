@@ -133,3 +133,16 @@ header {
 #headerCart:active {
     transform: translateY(0);
 }
+
+.header-nav-support {
+    background-color: #fff !important;
+    color: #ff6b00 !important;
+    border: 2px solid #ff6b00 !important;
+    box-shadow: none !important;
+}
+
+.header-nav-support:hover {
+    background-color: #fff8f0 !important;
+    color: #e05e00 !important;
+    border-color: #e05e00 !important;
+}

@@ -3,6 +3,19 @@ import '../css/app.css'
 
 import { createApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
+import { loadSiteSettings } from './settingsCache.js';
+
+loadSiteSettings().then((data) => {
+  const favicon = data?.favicon_icon || data?.favicon_url;
+  if (!favicon) return;
+  let link = document.querySelector("link[rel='icon']");
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'icon';
+    document.head.appendChild(link);
+  }
+  link.href = favicon;
+}).catch(() => {});
 
 createInertiaApp({
     resolve: name => {

@@ -1,8 +1,12 @@
 <template>
   <div class="auth-page">
+    <Head>
+      <title>{{ seo.title }}</title>
+      <meta name="description" :content="seo.description" />
+    </Head>
     <div class="auth-card">
       <div class="auth-header">
-        <h2>{{ isLogin ? 'Вход' : 'Регистрация' }}</h2>
+        <h1>{{ isLogin ? 'Вход' : 'Регистрация' }}</h1>
         <p>{{ isLogin ? 'Войдите в аккаунт' : 'Создайте новый аккаунт' }}</p>
       </div>
 
@@ -27,6 +31,10 @@
           <input v-model="password" type="password" placeholder="Минимум 6 символов" required minlength="6" />
         </div>
 
+        <p v-if="isLogin" class="forgot-row">
+          <a href="/forgot-password">Забыли пароль?</a>
+        </p>
+
         <div v-if="error" class="auth-error">{{ error }}</div>
         <div v-if="success" class="auth-success">{{ success }}</div>
 
@@ -49,10 +57,21 @@
 
 <script>
 import { router } from '@inertiajs/vue3';
-import { supabase } from '../../supabase';
+import { Head } from '@inertiajs/vue3';
+import { supabase, ensureProfile, formatPhoneInput } from '../../supabase.js';
+import { syncCartWithAuth } from '../../cart.js';
+import { usePageSeo } from '../../usePageSeo.js';
 
 export default {
   name: 'AuthPage',
+  components: { Head },
+  computed: {
+    seo() {
+      return this.isLogin
+        ? usePageSeo('Вход — FastBite', 'Войдите в аккаунт FastBite, чтобы оформлять заказы и видеть историю доставок.')
+        : usePageSeo('Регистрация — FastBite', 'Создайте аккаунт FastBite: сохраняйте адреса, получайте скидки и отслеживайте заказы.');
+    },
+  },
   data() {
     return {
       isLogin: true,
@@ -67,12 +86,7 @@ export default {
   },
   methods: {
     formatPhone() {
-      let numbers = this.phone.replace(/\D/g, '').slice(0, 11);
-      if (numbers.startsWith('8') && numbers.length > 0) numbers = '7' + numbers.slice(1);
-      if (numbers.startsWith('9') && numbers.length === 10) numbers = '7' + numbers;
-      this.phone = numbers.length 
-        ? `+7 (${numbers.slice(1,4)}) ${numbers.slice(4,7)}-${numbers.slice(7,9)}-${numbers.slice(9,11)}` 
-        : '';
+      this.phone = formatPhoneInput(this.phone);
     },
 
     async handleSubmit() {
@@ -87,7 +101,9 @@ export default {
             password: this.password,
           });
           if (error) throw error;
-          router.visit('/restaurans');
+          await syncCartWithAuth();
+          const redirect = new URLSearchParams(window.location.search).get('redirect') || '/restaurans';
+          router.visit(redirect);
         } else {
           // Регистрация с авто-подтверждением (без проверки почты)
           const { data, error } = await supabase.auth.signUp({
@@ -107,18 +123,25 @@ export default {
 
           // Авто-вход после регистрации
           if (data?.user) {
+            await ensureProfile(data.user, {
+              full_name: this.fullName,
+              phone: this.phone.replace(/\D/g, ''),
+            });
             const { error: signInError } = await supabase.auth.signInWithPassword({
               email: this.email,
               password: this.password,
             });
             if (!signInError) {
-              router.visit('/restaurans');
+              await syncCartWithAuth();
+              const redirect = new URLSearchParams(window.location.search).get('redirect') || '/restaurans';
+              router.visit(redirect);
               return;
             }
           }
 
           this.success = 'Регистрация успешна! Сейчас вы будете перенаправлены...';
-          setTimeout(() => router.visit('/restaurans'), 1500);
+          const redirect = new URLSearchParams(window.location.search).get('redirect') || '/restaurans';
+          setTimeout(() => router.visit(redirect), 1500);
         }
       } catch (err) {
         this.error = err.message === 'Invalid login credentials' 
@@ -151,7 +174,10 @@ export default {
   box-shadow: 0 4px 24px rgba(0,0,0,0.06);
 }
 .auth-header { text-align: center; margin-bottom: 2rem; }
-.auth-header h2 { font-size: 24px; font-weight: 700; color: #1e1e1e; margin: 0 0 6px; }
+.auth-header h1 { font-size: 24px; font-weight: 700; color: #1e1e1e; margin: 0 0 6px; }
+.forgot-row { text-align: right; margin: -8px 0 0; }
+.forgot-row a { color: #ff6b00; font-size: 14px; font-weight: 600; text-decoration: none; }
+.forgot-row a:hover { text-decoration: underline; }
 .auth-header p { color: #888; font-size: 15px; margin: 0; }
 .auth-form { display: flex; flex-direction: column; gap: 16px; }
 .form-group { display: flex; flex-direction: column; gap: 6px; }

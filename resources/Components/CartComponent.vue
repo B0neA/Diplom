@@ -36,6 +36,7 @@
 <script>
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
+import { getCurrentUser } from '../js/supabase.js';
 
 const api = axios.create({
   baseURL: 'https://cuibxmcjdkgjffmmzwgd.supabase.co/rest/v1',
@@ -72,7 +73,12 @@ export default {
   },
 
   methods: {
-    goToCheckout() {
+    async goToCheckout() {
+      const user = await getCurrentUser();
+      if (!user) {
+        router.visit('/auth?redirect=/check');
+        return;
+      }
       router.visit('/check');
     },
 
