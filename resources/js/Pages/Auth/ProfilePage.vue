@@ -248,6 +248,7 @@
                     :edit-rating="reviewEdit.rating"
                     :edit-comment="reviewEdit.comment"
                     :redact-icon="settings.redact_icon"
+                    :star-icon="settings.star_icon"
                     @edit="startEditReview(rev)"
                     @save="saveReviewEdit(rev.id)"
                     @cancel="editingReviewId = null"

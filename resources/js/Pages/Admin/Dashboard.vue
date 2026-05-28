@@ -309,48 +309,46 @@
             </div>
 
             <div v-if="reviewsLoading" class="status-msg">Загрузка отзывов...</div>
-            <div v-else-if="!filteredReviewGroups.length" class="status-msg">Отзывов нет</div>
+            <div v-else-if="!filteredReviewsFlat.length" class="status-msg">Отзывов нет</div>
             <div v-else class="reviews-grouped">
-              <div v-for="group in pagedReviewGroups" :key="group.restaurant_id" class="restaurant-group">
-                <h3 class="group-title">🍽 {{ group.restaurant_title }}</h3>
-                <div v-for="dish in group.dishes" :key="dish.product_id ?? 'restaurant'" class="dish-group">
-                  <h4>
-                    {{ dish.product_name }}
-                    <span v-if="dish.review_type === 'dish'" class="type-badge">Блюдо</span>
-                    <span v-else class="type-badge type-badge--restaurant">Ресторан</span>
-                  </h4>
-                  <div v-for="rev in dish.reviews" :key="rev.id" class="review-admin-card">
-                    <template v-if="editingReviewId === rev.id">
-                      <p class="review-edit-author">Автор: <strong>{{ reviewEdit.author_name }}</strong></p>
-                      <label class="review-edit-field">
-                        <span class="field-label">Оценка</span>
-                        <select v-model.number="reviewEdit.rating">
-                        <option v-for="n in 5" :key="n" :value="n">{{ n }} ★</option>
-                        </select>
-                      </label>
-                      <label class="review-edit-field">
-                        <span class="field-label">Комментарий</span>
-                        <textarea v-model="reviewEdit.comment" rows="2" placeholder="Текст отзыва"></textarea>
-                      </label>
-                      <div class="mini-actions">
-                        <button @click="saveReviewEdit(rev.id)">Сохранить</button>
-                        <button class="cancel" @click="editingReviewId = null">Отмена</button>
-                      </div>
-                    </template>
-                    <template v-else>
-                      <div class="review-admin-header">
-                        <strong>{{ rev.author_name }}</strong>
-                        <span class="stars">{{ '★'.repeat(rev.rating) }}</span>
-                        <div class="review-btns">
-                          <button class="edit-link" @click="startEditReview(rev)">Изменить</button>
-                          <button class="danger-btn" @click="deleteReview(rev)">Удалить</button>
-                        </div>
-                      </div>
-                      <p>{{ rev.comment }}</p>
-                      <small>{{ formatDate(rev.created_at) }}</small>
-                    </template>
+              <div v-for="rev in pagedReviewsList" :key="rev.id" class="review-admin-card">
+                <template v-if="editingReviewId === rev.id">
+                  <p class="review-edit-author">Автор: <strong>{{ reviewEdit.author_name }}</strong></p>
+                  <label class="review-edit-field">
+                    <span class="field-label">Оценка</span>
+                    <select v-model.number="reviewEdit.rating">
+                      <option v-for="n in 5" :key="n" :value="n">{{ n }} / 5</option>
+                    </select>
+                  </label>
+                  <label class="review-edit-field">
+                    <span class="field-label">Комментарий</span>
+                    <textarea v-model="reviewEdit.comment" rows="2" placeholder="Текст отзыва"></textarea>
+                  </label>
+                  <div class="mini-actions">
+                    <button @click="saveReviewEdit(rev.id)">Сохранить</button>
+                    <button class="cancel" @click="editingReviewId = null">Отмена</button>
                   </div>
-                </div>
+                </template>
+                <template v-else>
+                  <div class="review-admin-header">
+                    <strong>{{ rev.author_name }}</strong>
+                    <span class="review-subject">{{ reviewSubjectLabel(rev) }}</span>
+                    <span class="stars">
+                      <span
+                        v-for="n in 5"
+                        :key="`adm-${rev.id}-${n}`"
+                        class="star-icon"
+                        :style="starStyle(n <= Number(rev.rating || 0))"
+                      />
+                    </span>
+                    <div class="review-btns">
+                      <button class="edit-link" @click="startEditReview(rev)">Изменить</button>
+                      <button class="danger-btn" @click="deleteReview(rev)">Удалить</button>
+                    </div>
+                  </div>
+                  <p>{{ rev.comment }}</p>
+                  <small>{{ formatDate(rev.created_at) }}</small>
+                </template>
               </div>
               <div class="pager" v-if="reviewsTotalPages > 1">
                 <button :disabled="reviewsPage <= 1" @click="reviewsPage--">←</button>
@@ -398,6 +396,7 @@ import HeaderComponent from '../../../Components/HeaderComponent.vue';
 import AdminMiniModal from '../../../Components/AdminMiniModal.vue';
 import AdminArchiveModal from '../../../Components/AdminArchiveModal.vue';
 import { getCurrentUser, getCurrentSession, isAdmin, getLaravelApi } from '../../supabase.js';
+import { loadSiteSettings } from '../../settingsCache.js';
 
 const emptyProductForm = () => ({
   name: '', description: '', price: null, category: '', restaurant_id: null,
@@ -442,7 +441,7 @@ export default {
       reviewEdit: { author_name: '', rating: 5, comment: '' },
       reviewsSort: 'new',
       reviewsPage: 1,
-      reviewsPageSize: 1,
+      reviewsPageSize: 12,
       reviewsRestaurantTab: 'all',
       reviewsTypeFilter: 'all',
       archiveItems: [],
@@ -450,6 +449,7 @@ export default {
       archiveModal: { show: false, type: 'restaurant' },
       confirmModal: { show: false, title: '', message: '', action: null },
       restoreNotice: { show: false, title: '', message: '' },
+      settings: { star_icon: '' },
     };
   },
   computed: {
@@ -468,23 +468,53 @@ export default {
       if (this.reviewsRestaurantTab !== 'all') {
         groups = groups.filter(g => String(g.restaurant_id) === String(this.reviewsRestaurantTab));
       }
-      return groups.map(g => ({
+      const mapped = groups.map(g => ({
         ...g,
         restaurant_title: this.restaurantDisplayTitle(g.restaurant_id, g.restaurant_title),
         dishes: (g.dishes || [])
           .map(dish => ({
             ...dish,
-            reviews: (dish.reviews || []).filter(rev => this.reviewMatchesType(rev, dish)),
+            reviews: this.sortReviewsList(
+              (dish.reviews || []).filter(rev => this.reviewMatchesType(rev, dish))
+            ),
           }))
           .filter(dish => dish.reviews.length > 0),
       })).filter(g => g.dishes.length > 0);
+
+      const score = (group) => {
+        const all = group.dishes.flatMap(d => d.reviews || []);
+        if (!all.length) return 0;
+        if (this.reviewsSort === 'good' || this.reviewsSort === 'bad') {
+          return Number(all[0]?.rating || 0);
+        }
+        return new Date(all[0]?.created_at || 0).getTime();
+      };
+
+      return mapped.sort((a, b) => {
+        const sa = score(a);
+        const sb = score(b);
+        if (this.reviewsSort === 'old' || this.reviewsSort === 'bad') return sa - sb;
+        return sb - sa;
+      });
+    },
+    filteredReviewsFlat() {
+      return this.filteredReviewGroups.flatMap(group =>
+        (group.dishes || []).flatMap(dish =>
+          (dish.reviews || []).map(rev => ({
+            ...rev,
+            restaurant_title: group.restaurant_title,
+            product_name: dish.product_name,
+            review_type: dish.review_type,
+          }))
+        )
+      );
     },
     reviewsTotalPages() {
-      return Math.max(1, Math.ceil(this.filteredReviewGroups.length / this.reviewsPageSize));
+      return Math.max(1, Math.ceil(this.filteredReviewsFlat.length / this.reviewsPageSize));
     },
-    pagedReviewGroups() {
+    pagedReviewsList() {
       const start = (this.reviewsPage - 1) * this.reviewsPageSize;
-      return this.filteredReviewGroups.slice(start, start + this.reviewsPageSize);
+      return this.filteredReviewsFlat.slice(start, start + this.reviewsPageSize);
     },
     archivedProducts() {
       return this.archiveItems.filter(i => i.type === 'product');
@@ -528,6 +558,28 @@ export default {
     },
   },
   methods: {
+    sortReviewsList(list) {
+      const arr = [...list];
+      if (this.reviewsSort === 'old') return arr.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      if (this.reviewsSort === 'good') return arr.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
+      if (this.reviewsSort === 'bad') return arr.sort((a, b) => (Number(a.rating) || 0) - (Number(b.rating) || 0));
+      return arr.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    },
+    reviewSubjectLabel(rev) {
+      if (rev.review_type === 'restaurant') return rev.restaurant_title || 'Ресторан';
+      return rev.product_name || 'Блюдо';
+    },
+    starStyle(active) {
+      const icon = this.settings.star_icon;
+      if (!icon) {
+        return { color: active ? '#ff6b00' : '#c3c3c3' };
+      }
+      return {
+        background: active ? 'var(--brand-gradient)' : '#c3c3c3',
+        WebkitMaskImage: `url("${icon}")`,
+        maskImage: `url("${icon}")`,
+      };
+    },
     switchTab(name) {
       this.tab = name;
       if (name === 'orders' && !this.orders.length) this.loadOrders();
@@ -550,9 +602,9 @@ export default {
     reviewMatchesType(rev, dish) {
       if (this.reviewsTypeFilter === 'all') return true;
       if (this.reviewsTypeFilter === 'restaurant') {
-        return rev.source === 'restaurant' || dish.review_type === 'restaurant';
+        return rev.source === 'restaurant' || dish.review_type === 'restaurant' || rev.product_id == null;
       }
-      return rev.source === 'dish' || dish.review_type === 'dish';
+      return rev.source === 'dish' || dish.review_type === 'dish' || rev.product_id != null;
     },
     setReviewsRestaurantTab(tab) {
       this.reviewsRestaurantTab = tab;
@@ -1069,6 +1121,10 @@ export default {
   },
   async mounted() {
     await this.checkAccess();
+    try {
+      const s = await loadSiteSettings();
+      this.settings.star_icon = s?.star_icon || '';
+    } catch { /* ignore */ }
     this.archiveItems = this.mergeArchiveLists(this.readArchiveFromStorage());
     this.loading = false;
   },
@@ -1179,7 +1235,28 @@ select { padding: 6px 10px; border-radius: 8px; border: 1px solid #ddd; }
 .dish-group h4 { margin: 0 0 10px; color: #555; font-size: 16px; }
 .review-admin-card { background: #fefaf5; padding: 12px; border-radius: 12px; margin-bottom: 8px; }
 .review-admin-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
-.stars { color: #ff6b00; }
+.review-subject {
+  font-size: 12px;
+  color: #666;
+  background: #f5f5f5;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.stars {
+  display: inline-flex;
+  gap: 4px;
+}
+.star-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
 .review-btns { margin-left: auto; display: flex; gap: 8px; }
 .review-edit-author { margin: 0 0 10px; font-size: 14px; color: #555; }
 .review-edit-field { display: block; margin-bottom: 10px; }

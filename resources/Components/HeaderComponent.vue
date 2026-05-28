@@ -22,7 +22,11 @@
           <div v-if="showResults && filtered.length" class="search-results">
             <div v-for="r in filtered" :key="r.id" class="search-result-item" @mousedown="goToRestaurant(r.id)">
               <span class="restaurant-name">{{ r.title }}</span>
-              <span class="restaurant-rating">★ {{ formatSearchRating(r) }}</span>
+              <span class="restaurant-rating">
+                <img v-if="settings.star_icon" :src="settings.star_icon" class="search-star-icon" alt="" />
+                <span v-else>★</span>
+                {{ formatSearchRating(r) }}
+              </span>
             </div>
           </div>
           <div v-if="showResults && searchQuery && !filtered.length" class="search-results">
@@ -684,7 +688,8 @@ export default {
 .search-result-item:last-child { border-bottom: none; }
 .search-result-item:hover { background: #fff8f0; }
 .restaurant-name { font-size: 15px; font-weight: 600; color: #1e1e1e; }
-.restaurant-rating { font-size: 13px; color: #ff6b00; font-weight: 600; }
+.restaurant-rating { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #ff6b00; font-weight: 600; }
+.search-star-icon { width: 12px; height: 12px; object-fit: contain; }
 .search-no-results { padding: 16px; text-align: center; color: #999; font-size: 14px; }
 
 .burger-btn {

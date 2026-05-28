@@ -45,8 +45,8 @@
         <h2>Оценка ресторана: {{ restaurantRatingText }}</h2>
         <div v-if="user" class="review-form">
           <h3>Оставить отзыв о ресторане</h3>
-          <div class="stars-input">
-            <button v-for="n in 5" :key="n" type="button" :class="{ active: n <= restaurantReview.rating }" @click="restaurantReview.rating = n">★</button>
+          <div class="stars-input" :style="starMaskVars">
+            <button v-for="n in 5" :key="n" type="button" class="rating-star-btn" :class="{ active: n <= restaurantReview.rating }" @click="restaurantReview.rating = n"></button>
           </div>
           <textarea v-model="restaurantReview.comment" rows="3" placeholder="Ваше пожелание..."></textarea>
           <button @click="submitRestaurantReview" :disabled="sendingRestaurantReview">{{ sendingRestaurantReview ? 'Отправка...' : 'Отправить' }}</button>
@@ -64,6 +64,7 @@
             :edit-rating="editState.rating"
             :edit-comment="editState.comment"
             :redact-icon="redactIcon"
+            :star-icon="starIcon"
             @edit="startEdit('restaurant', r)"
             @save="saveEdit('restaurant', r.id)"
             @cancel="cancelEdit"
@@ -89,8 +90,8 @@
             <option :value="null" disabled>Выберите блюдо</option>
             <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }}</option>
           </select>
-          <div class="stars-input">
-            <button v-for="n in 5" :key="`d-${n}`" type="button" :class="{ active: n <= dishReview.rating }" @click="dishReview.rating = n">★</button>
+          <div class="stars-input" :style="starMaskVars">
+            <button v-for="n in 5" :key="`d-${n}`" type="button" class="rating-star-btn" :class="{ active: n <= dishReview.rating }" @click="dishReview.rating = n"></button>
           </div>
           <textarea v-model="dishReview.comment" rows="3" placeholder="Ваш отзыв о блюде..."></textarea>
           <button @click="submitDishReview" :disabled="sendingDishReview || !dishReview.product_id">
@@ -102,7 +103,7 @@
         <div v-if="!productGroups.length" class="empty reviews-list-spaced">Пока нет отзывов о блюдах</div>
         <div v-else class="reviews-list-spaced">
           <div v-for="group in pagedProductGroups" :key="group.product_id" class="product-group">
-            <h3>{{ group.product_name }} <span v-if="group.product_rating" class="group-rating">★ {{ group.product_rating }}</span></h3>
+            <h3>{{ group.product_name }} <span v-if="group.product_rating" class="group-rating">{{ group.product_rating }}</span></h3>
             <ReviewCardUser
               v-for="r in group.reviews"
               :key="`pr-${r.id}`"
@@ -112,6 +113,7 @@
               :edit-rating="editState.rating"
               :edit-comment="editState.comment"
               :redact-icon="redactIcon"
+              :star-icon="starIcon"
               @edit="startEdit('dish', r)"
               @save="saveEdit('dish', r.id)"
               @cancel="cancelEdit"
@@ -160,6 +162,7 @@ export default {
       restaurant: null,
       user: null,
       redactIcon: '',
+      starIcon: '',
       activeTab: 'restaurant',
       sortMode: 'new',
       restaurantPage: 1,
@@ -231,6 +234,10 @@ export default {
     },
     dishesTotalPages() {
       return Math.max(1, Math.ceil(this.productGroups.length / this.pageSize));
+    },
+    starMaskVars() {
+      if (!this.starIcon) return {};
+      return { '--star-mask': `url("${this.starIcon}")` };
     },
   },
   watch: {
@@ -361,6 +368,7 @@ export default {
     try {
       const settings = await loadSiteSettings();
       this.redactIcon = settings?.redact_icon || '';
+      this.starIcon = settings?.star_icon || '';
     } catch { /* ignore */ }
     this.user = await getCurrentUser();
     await this.loadAll();
@@ -395,14 +403,33 @@ h1 { margin: 0 0 1rem; }
 .review-form textarea,
 .review-form select { width: 100%; border: 2px solid #eee; border-radius: 10px; padding: 10px; box-sizing: border-box; margin: 8px 0; }
 .review-form button { border: none; background: #ff6b00; color: #fff; padding: 10px 16px; border-radius: 10px; cursor: pointer; }
+#1 { border: none; background: #ff6b00; color: #fff; padding: 10px 16px; border-radius: 10px; cursor: pointer; }
 .field-label { font-size: 13px; color: #666; display: block; margin-top: 4px; }
 .dish-review-form { margin-bottom: 0; padding-bottom: 1rem; border-bottom: 1px solid #f0f0f0; }
 .reviews-list-spaced { margin-top: 1.75rem; }
-.stars-input button { border: none; background: none; font-size: 24px; color: #ddd; cursor: pointer; }
-.stars-input button.active { color: #ff6b00; }
+.stars-input { display: inline-flex; gap: 6px; }
+.stars-input button {
+  border: none;
+  width: 24px;
+  height: 24px;
+  background: #c3c3c3;
+  cursor: pointer;
+  padding: 0;
+}
+.stars-input[style*="--star-mask"] button {
+  -webkit-mask-image: var(--star-mask);
+  mask-image: var(--star-mask);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+.stars-input button.active { background: var(--brand-gradient); }
 .product-group { margin-bottom: 1.5rem; }
 .product-group h3 { margin: 0 0 12px; }
-.group-rating { font-size: 14px; color: #ff6b00; font-weight: 600; }
+.group-rating { font-size: 14px; color: #333; font-weight: 600; }
 .empty { color: #999; text-align: center; padding: 1rem; }
 .pager { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; }
 .pager button { padding: 8px 14px; border: 2px solid #eee; border-radius: 8px; background: #fff; cursor: pointer; }

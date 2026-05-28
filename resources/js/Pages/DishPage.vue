@@ -18,7 +18,7 @@
           </div>
           <div class="dish-info">
             <h1>{{ dish.name }}</h1>
-            <p v-if="dishRatingText" class="dish-rating">★ {{ dishRatingText }}</p>
+            <p v-if="dishRatingText" class="dish-rating">{{ dishRatingText }}</p>
             <p class="price">{{ dish.price }} ₽</p>
             <p v-if="dish.description" class="desc">{{ dish.description }}</p>
 
@@ -60,14 +60,14 @@
 
           <div v-if="user" class="review-form">
             <h3>Оставить отзыв</h3>
-            <div class="rating-input">
+            <div class="rating-input" :style="starMaskVars">
               <button
                 v-for="n in 5"
                 :key="n"
                 type="button"
-                :class="['star', { active: n <= newReview.rating }]"
+                :class="['star', 'rating-star-btn', { active: n <= newReview.rating }]"
                 @click="newReview.rating = n"
-              >★</button>
+              ></button>
             </div>
             <textarea v-model="newReview.comment" placeholder="Ваш отзыв..." rows="3"></textarea>
             <button class="submit-review" :disabled="submittingReview" @click="submitReview">
@@ -89,6 +89,7 @@
               :edit-rating="editState.rating"
               :edit-comment="editState.comment"
               :redact-icon="redactIcon"
+              :star-icon="starIcon"
               @edit="startEdit(r)"
               @save="saveEdit(r.id)"
               @cancel="cancelEdit"
@@ -132,6 +133,7 @@ export default {
       reviews: [],
       user: null,
       redactIcon: '',
+      starIcon: '',
       submittingReview: false,
       newReview: { rating: 5, comment: '' },
       placeholder: '',
@@ -157,6 +159,10 @@ export default {
         return `${avg.toFixed(1)} (${this.reviews.length} отзывов)`;
       }
       return '';
+    },
+    starMaskVars() {
+      if (!this.starIcon) return {};
+      return { '--star-mask': `url("${this.starIcon}")` };
     },
   },
   methods: {
@@ -269,6 +275,7 @@ export default {
     try {
       const settings = await loadSiteSettings();
       this.redactIcon = settings?.redact_icon || '';
+      this.starIcon = settings?.star_icon || '';
       await syncCartWithAuth();
       await Promise.all([this.loadDish(), this.loadReviews(), this.checkUser()]);
     } finally {
@@ -305,8 +312,25 @@ export default {
 .reviews-section h2 { margin: 0 0 1.5rem; }
 .review-form { margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid #f0f0f0; }
 .rating-input { margin-bottom: 10px; }
-.star { background: none; border: none; font-size: 28px; color: #ddd; cursor: pointer; }
-.star.active { color: #ff6b00; }
+.rating-input { display: inline-flex; gap: 6px; }
+.star {
+  background: #c3c3c3;
+  border: none;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+}
+.rating-input[style*="--star-mask"] .star {
+  -webkit-mask-image: var(--star-mask);
+  mask-image: var(--star-mask);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+.star.active { background: var(--brand-gradient); }
 .review-form textarea { width: 100%; padding: 12px; border: 2px solid #eee; border-radius: 12px; margin-bottom: 10px; box-sizing: border-box; }
 .submit-review { padding: 10px 24px; background: #ff6b00; color: #fff; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; }
 .auth-hint { color: #888; margin-bottom: 1rem; }

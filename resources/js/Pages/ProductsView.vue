@@ -2,7 +2,7 @@
 import HeaderComponent from '../../Components/HeaderComponent.vue';
 import { router } from '@inertiajs/vue3';
 import { Head } from '@inertiajs/vue3';
-import { ref, reactive, watch, onMounted } from 'vue';
+import { ref, reactive, watch, onMounted, computed } from 'vue';
 import { loadSiteSettings, applySiteSettings } from '../settingsCache.js';
 import { usePageSeo } from '../usePageSeo.js';
 import axios from 'axios';
@@ -134,6 +134,14 @@ const onImageError = (e) => {
     '</svg>'
   );
 };
+const starStyle = computed(() => {
+  if (!settings.star_icon) return {};
+  return {
+    background: 'var(--brand-gradient)',
+    WebkitMaskImage: `url("${settings.star_icon}")`,
+    maskImage: `url("${settings.star_icon}")`,
+  };
+});
 
 watch([sortBy, sortOrder], applyFilters);
 onMounted(() => {
@@ -246,7 +254,7 @@ onMounted(() => {
           <div class="card-body">
             <h3>{{ r.title }}</h3>
             <div class="rating-row">
-              <span class="star">★</span>
+              <span class="star" :style="starStyle"></span>
               <span class="rating-value">{{ displayRating(r) }}</span>
               <span class="delivery-time">{{ formatDelivery(r) }}</span>
             </div>
@@ -534,8 +542,16 @@ onMounted(() => {
 }
 
 .star {
-  color: #ff6b00;
-  font-size: 15px;
+  width: 14px;
+  height: 14px;
+  background: var(--brand-gradient);
+  display: inline-block;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
 }
 
 .rating-value {

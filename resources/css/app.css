@@ -11,7 +11,7 @@
 .add-btn,
 .submit-btn,
 .submit-review,
-.review-form button,
+.review-form button:not(.rating-star-btn):not(.star),
 .faq-toolbar-btn,
 .order-success-btn,
 .modal-btn,
@@ -30,7 +30,7 @@
 .add-btn:hover:not(:disabled),
 .submit-btn:hover:not(:disabled),
 .submit-review:hover:not(:disabled),
-.review-form button:hover:not(:disabled),
+/* .review-form button:hover:not(:disabled), */
 .faq-toolbar-btn:hover:not(:disabled),
 .order-success-btn:hover:not(:disabled),
 .modal-btn:hover:not(:disabled),
@@ -69,7 +69,7 @@
 }
 
 /* Remove any gradient borders on all buttons */
-button,
+button:not(.rating-star-btn):not(.star),
 a#headerCart,
 .filter-btn,
 .checkout-tab,
@@ -83,6 +83,28 @@ a#headerCart,
   -webkit-mask-image: none !important;
   mask-image: none !important;
   background-clip: border-box !important;
+}
+
+/* Star rating buttons must ignore global button styles */
+button.rating-star-btn,
+button.star {
+  all: unset;
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  background: #c3c3c3;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+button.rating-star-btn.active,
+button.star.active {
+  background: var(--brand-gradient);
 }
 
 /* Unified gradient buttons across key pages */
@@ -99,7 +121,7 @@ a#headerCart,
 .confirm-save,
 .submit-btn,
 .submit-review,
-.review-form button,
+.review-form button:not(.rating-star-btn):not(.star),
 .add-btn,
 .add-to-cart-btn,
 .quantity-btn {
@@ -119,7 +141,7 @@ a#headerCart,
 .confirm-save:hover:not(:disabled),
 .submit-btn:hover:not(:disabled),
 .submit-review:hover:not(:disabled),
-.review-form button:hover:not(:disabled),
+/* .review-form button:hover:not(:disabled), */
 .add-btn:hover:not(:disabled),
 .add-to-cart-btn:hover:not(:disabled),
 .quantity-btn:hover:not(:disabled) {

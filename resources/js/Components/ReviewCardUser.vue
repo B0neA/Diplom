@@ -2,7 +2,7 @@
   <div class="review-card-user">
     <template v-if="editing">
       <select :value="editRating" class="rating-select" @change="$emit('update:editRating', Number($event.target.value))">
-        <option v-for="n in 5" :key="n" :value="n">{{ n }} ★</option>
+        <option v-for="n in 5" :key="n" :value="n">{{ n }} / 5</option>
       </select>
       <textarea :value="editComment" rows="3" @input="$emit('update:editComment', $event.target.value)"></textarea>
       <div class="mini-actions">
@@ -13,7 +13,13 @@
     <template v-else>
       <div class="review-head">
         <strong>{{ review.author_name }}</strong>
-        <span class="stars">{{ '★'.repeat(review.rating) }}{{ '☆'.repeat(5 - review.rating) }}</span>
+        <span class="stars" :style="starMaskVars">
+          <span
+            v-for="n in 5"
+            :key="`star-${n}`"
+            :class="['rating-star', { active: n <= Number(review.rating || 0) }]"
+          />
+        </span>
         <div v-if="canEdit" class="review-btns">
           <button type="button" class="edit-link" @click="$emit('edit')">Изменить</button>
           <button type="button" class="danger-link" @click="$emit('delete')">Удалить</button>
@@ -41,6 +47,7 @@ export default {
     editRating: { type: Number, default: 5 },
     editComment: { type: String, default: '' },
     redactIcon: { type: String, default: '' },
+    starIcon: { type: String, default: '' },
   },
   emits: ['edit', 'save', 'cancel', 'delete', 'update:editRating', 'update:editComment'],
   computed: {
@@ -51,6 +58,10 @@ export default {
     },
     displayDate() {
       return this.isEdited ? this.review.updated_at : this.review.created_at;
+    },
+    starMaskVars() {
+      if (!this.starIcon) return {};
+      return { '--star-mask': `url("${this.starIcon}")` };
     },
   },
   methods: {
@@ -75,7 +86,31 @@ export default {
   flex-wrap: wrap;
   margin-bottom: 8px;
 }
-.stars { color: #ff6b00; }
+.stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.rating-star {
+  width: 15px;
+  height: 15px;
+  border-radius: 2px;
+  background: #c3c3c3;
+  display: inline-block;
+}
+.stars[style*="--star-mask"] .rating-star {
+  -webkit-mask-image: var(--star-mask);
+  mask-image: var(--star-mask);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+.rating-star.active {
+  background: var(--brand-gradient);
+}
 .review-btns { margin-left: auto; display: flex; gap: 8px; }
 .edit-link, .danger-link {
   background: none;
